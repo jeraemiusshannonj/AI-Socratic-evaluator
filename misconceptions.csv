@@ -1,0 +1,11 @@
+Concept,Misconception
+Binary Search,Setting high = mid instead of high = mid - 1 causing an infinite loop when target is smaller than mid.
+SQL Left Join,Placing a WHERE clause condition on the right table instead of in the ON clause silently converting the LEFT JOIN into an INNER JOIN.
+Python Lists,Modifying a list (removing elements) while iterating over it with a standard for-loop causing skipped elements.
+Python Default Arguments,Using a mutable object like a list or dictionary as a default argument in a function definition causing state to persist across calls.
+Recursion,Failing to decrement or modify the state variable toward the base case resulting in a recursion limit exceed error.
+SQL Group By,Selecting non-aggregated columns that are not included in the GROUP BY clause causing logical errors or query failures.
+Python Object Mutability,Assuming assigning a list to a new variable (b = a) creates an independent copy rather than a reference to the same object.
+Hash Tables,Attempting to use a mutable type like a list as a dictionary key or set element in Python.
+Graph Traversal (BFS),Forgetting to mark nodes as visited when adding them to the queue causing infinite loops in cyclic graphs.
+Object-Oriented Programming,Confusing class variables with instance variables in Python leading to unintended shared state across instances.
