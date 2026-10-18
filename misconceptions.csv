@@ -1,11 +1,12 @@
 Concept,Misconception
-Binary Search,Setting high = mid instead of high = mid - 1 causing an infinite loop when target is smaller than mid.
-SQL Left Join,Placing a WHERE clause condition on the right table instead of in the ON clause silently converting the LEFT JOIN into an INNER JOIN.
-Python Lists,Modifying a list (removing elements) while iterating over it with a standard for-loop causing skipped elements.
-Python Default Arguments,Using a mutable object like a list or dictionary as a default argument in a function definition causing state to persist across calls.
-Recursion,Failing to decrement or modify the state variable toward the base case resulting in a recursion limit exceed error.
-SQL Group By,Selecting non-aggregated columns that are not included in the GROUP BY clause causing logical errors or query failures.
-Python Object Mutability,Assuming assigning a list to a new variable (b = a) creates an independent copy rather than a reference to the same object.
-Hash Tables,Attempting to use a mutable type like a list as a dictionary key or set element in Python.
-Graph Traversal (BFS),Forgetting to mark nodes as visited when adding them to the queue causing infinite loops in cyclic graphs.
-Object-Oriented Programming,Confusing class variables with instance variables in Python leading to unintended shared state across instances.
+"Linear Search","Returning False or a failure value inside the loop after the first non-matching element instead of waiting until all elements are checked."
+"Binary Search (Off-by-One)","Setting high = mid instead of high = mid - 1 when target < arr[mid] causing an infinite loop on narrow ranges."
+"Binary Search (Loop Condition)","Using while low < high instead of while low <= high causing the algorithm to skip checking the last remaining candidate element."
+"Bubble Sort (Early Exit)","Failing to track whether any swaps occurred during a pass causing O(n^2) time even on already sorted arrays."
+"Selection Sort (Min Index Swap)","Swapping element values inside the inner loop during comparison rather than tracking min_idx and swapping once per outer iteration."
+"Insertion Sort (Shifting Bug)","Overwriting elements forward during shifting without saving the key element or placing key at mid - 1 instead of j + 1."
+"Merge Sort (Slice Overhead)","Creating fresh list slices like arr[:mid] inside recursive calls rather than passing index pointers low and high resulting in excessive memory usage."
+"Merge Sort (Two-Pointer Comparison)","Incrementing the main array pointer without advancing the left or right sub-array pointer causing infinite duplicate writes."
+"Quick Sort (Partition Off-By-One)","Including the pivot index in both recursive sub-arrays (e.g. quicksort(arr, low, pivot) instead of pivot - 1) causing stack overflow."
+"Quick Sort (Lomuto Partition)","Not incrementing the smaller element boundary i before swapping with j leading to incorrect element placement around the pivot."
+"Heap Sort (0-Indexed Parent/Child)","Using 2*i and 2*i + 1 for child indices in a 0-indexed array instead of 2*i + 1 and 2*i + 2 causing index out-of-bounds errors."
