@@ -79,6 +79,19 @@ NUM_CANDIDATES_MULTIPLIER = 20
 CHUNK_TARGET_CHARS = 1400
 CHUNK_OVERLAP_CHARS = 200
 
+# gemini-embedding-001 accepts up to 2048 input tokens and silently truncates
+# past that when auto_truncate is on. At ~4 chars/token that is ~8000 chars.
+# We hard-split well below the ceiling so no chunk is ever embedded as a
+# partial, which would look like a retrieval miss and be near-impossible to
+# diagnose from the output.
+MAX_CHUNK_CHARS = 6000
+
+# A chunk shorter than this carries too little context to be worth retrieving
+# on its own -- it wins on cosine similarity for the wrong reasons (short
+# texts embed tightly) and then supplies nothing the critic can cite. Tails
+# below this are merged back into the preceding chunk.
+MIN_CHUNK_CHARS = 300
+
 
 def require_mongo_uri() -> str:
   return MONGO_URI or _require("MONGO_URI")

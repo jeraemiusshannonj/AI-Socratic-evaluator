@@ -91,6 +91,11 @@ def _embed_call(texts: Sequence[str], task_type: str) -> list[list[float]]:
       config=types.EmbedContentConfig(
           task_type=task_type,
           output_dimensionality=config.EMBED_DIM,
+          # Explicit rather than relying on the default: a silent truncation
+          # here produces a valid-looking vector for partial text, which is
+          # the hardest class of retrieval bug to find later. The chunker
+          # already guarantees we stay under the limit.
+          auto_truncate=False,
       ),
   )
   return [list(e.values) for e in resp.embeddings]
