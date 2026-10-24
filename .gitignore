@@ -2,6 +2,17 @@
 .venv/
 venv/
 __pycache__/
+*.pyc
 chroma_db/
 .idea/
 .vscode/
+
+# Local interaction logs. These were committed previously with ~112 rows of
+# real session data; they are now history-only and should not come back.
+*.db
+*.sqlite
+*.sqlite3
+
+# Eval artifacts
+eval/results/
+*.jsonl.gz

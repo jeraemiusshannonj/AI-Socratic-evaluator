@@ -1,9 +1,14 @@
+# Core service
 fastapi
-uvicorn
+uvicorn[standard]
 streamlit
-langchain
-langchain-groq
-chromadb
-pandas
-python-dotenv
 requests
+pydantic
+
+# Vertex AI (replaces langchain-groq / ChatGroq)
+google-genai
+
+# Atlas: vector search + structured retrieval (replaces chromadb)
+pymongo
+
+python-dotenv
