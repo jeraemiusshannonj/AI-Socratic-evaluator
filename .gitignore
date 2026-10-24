@@ -16,3 +16,10 @@ chroma_db/
 # Eval artifacts
 eval/results/
 *.jsonl.gz
+
+# Corpus build. Upstream clones and the converted markdown are both
+# reproducible from corpus/sources.py via `python -m scripts.build_corpus`,
+# so the repository carries the mapping and the converter rather than a copy
+# of three upstream documentation projects.
+corpus/_sources/
+corpus/_build/
