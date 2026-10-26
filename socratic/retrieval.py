@@ -14,7 +14,7 @@ stuffing everything into one query and calling it hybrid.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -31,9 +31,15 @@ class Passage:
   source_title: str
   source_url: str
   concept_tags: list[str]
+  heading_trail: list[str] = field(default_factory=list)
 
   def as_prompt_block(self) -> str:
     return f"[{self.chunk_id}] (source: {self.source_title})\n{self.text}"
+
+  @property
+  def section(self) -> str:
+    """Where in the source document this passage came from."""
+    return " > ".join(self.heading_trail)
 
   def to_dict(self) -> dict[str, Any]:
     return asdict(self)
@@ -75,16 +81,23 @@ def semantic_search(
   if concept:
     stage["filter"] = {"concept_tags": {"$in": [concept]}}
 
+  # Field names here must match what scripts/ingest_corpus.py writes: the
+  # chunk id is the document `_id` ("{source_id}#{index}"), and the source
+  # title and link are `title` and `url`. Projecting `chunk_id`,
+  # `source_title` and `source_url` instead returns passages whose text and
+  # score are correct and whose citation is empty -- which looks like a
+  # working pipeline right up until something tries to cite a source.
   pipeline = [
       {"$vectorSearch": stage},
       {
           "$project": {
-              "_id": 0,
-              "chunk_id": 1,
+              "_id": 1,
               "text": 1,
               "concept_tags": 1,
-              "source_title": 1,
-              "source_url": 1,
+              "title": 1,
+              "url": 1,
+              "source_id": 1,
+              "heading_trail": 1,
               "score": {"$meta": "vectorSearchScore"},
           }
       },
@@ -96,12 +109,13 @@ def semantic_search(
       continue
     results.append(
         Passage(
-            chunk_id=doc.get("chunk_id", ""),
+            chunk_id=str(doc.get("_id", "")),
             text=doc.get("text", ""),
             score=round(float(doc.get("score", 0.0)), 4),
-            source_title=doc.get("source_title", "unknown"),
-            source_url=doc.get("source_url", ""),
+            source_title=doc.get("title") or doc.get("source_id", "unknown"),
+            source_url=doc.get("url", ""),
             concept_tags=doc.get("concept_tags", []),
+            heading_trail=doc.get("heading_trail", []),
         )
     )
   return results
@@ -234,7 +248,8 @@ def corpus_stats() -> dict[str, Any]:
       "interactions": db.interactions().count_documents({}),
       "test_cases": db.test_cases().count_documents({}),
       "distinct_concepts": len(db.chunks().distinct("concept_tags")),
-      "distinct_sources": len(db.chunks().distinct("source_title")),
+      "distinct_sources": len(db.chunks().distinct("source_id")),
+      "licenses": sorted(db.chunks().distinct("license")),
       "interactions_since": cutoff.isoformat(),
   }
 

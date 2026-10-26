@@ -387,7 +387,9 @@ def main() -> int:
 
   print(f"\n{db.chunks().count_documents({})} chunks now in "
         f"{config.MONGO_DB}.{config.COLL_CHUNKS}")
-  print("\nNext: python -m scripts.bootstrap_db  (builds the vector index)")
+  print("\nNext: python -m scripts.try_search --selftest")
+  print("      (bootstrap_db only needs re-running if the index is missing;"
+        " Atlas indexes new documents on its own)")
   return 0
 
 
