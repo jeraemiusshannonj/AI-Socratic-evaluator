@@ -93,9 +93,38 @@ MAX_CHUNK_CHARS = 6000
 MIN_CHUNK_CHARS = 300
 
 
+# Values straight out of .env.example. Left in place they produce failures
+# that look like infrastructure problems: a project ID of
+# "your-gcp-project-id" comes back from Vertex as a 404 on the publisher
+# model, which reads as a wrong model ID rather than an unedited config file.
+_PLACEHOLDERS = frozenset({
+    "your-gcp-project-id",
+    "your_gcp_project_id",
+    "your-project-id",
+    "your_project_id",
+    "YOUR_PROJECT_ID",
+    "changeme",
+    "mongodb+srv://USER:PASSWORD@cluster0.xxxxx.mongodb.net/"
+    "?retryWrites=true&w=majority",
+})
+
+
+def _reject_placeholder(name: str, value: str) -> str:
+  if value in _PLACEHOLDERS or "USER:PASSWORD" in value:
+    raise RuntimeError(
+        f"{name} is still the placeholder from .env.example ({value!r}). "
+        f"Open .env and set a real value."
+    )
+  return value
+
+
 def require_mongo_uri() -> str:
-  return MONGO_URI or _require("MONGO_URI")
+  return _reject_placeholder(
+      "MONGO_URI", MONGO_URI or _require("MONGO_URI")
+  )
 
 
 def require_gcp_project() -> str:
-  return GCP_PROJECT or _require("GCP_PROJECT")
+  return _reject_placeholder(
+      "GCP_PROJECT", GCP_PROJECT or _require("GCP_PROJECT")
+  )

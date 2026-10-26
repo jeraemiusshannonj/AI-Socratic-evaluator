@@ -154,18 +154,67 @@ def embed_query(text: str) -> list[float]:
 
 
 def _retry(fn, attempts: int = 4, base_delay: float = 1.0):
+  """Retry with exponential backoff, and never hide why it failed.
+
+  Two kinds of failure arrive through the same exception type here: a
+  transient one worth retrying (rate limit, backend hiccup) and a
+  permanent one that will fail identically four times in a row (a project
+  that does not exist, a model ID that was retired, a missing permission).
+  Logging only the class name turns the second kind into a silent 7-second
+  wait followed by "failed after 4 attempts", which says nothing about the
+  misconfiguration that caused it. So the message is carried through, and
+  the permanent cases are not retried at all.
+  """
   last: Exception | None = None
   for i in range(attempts):
     try:
       return fn()
     except Exception as exc:  # noqa: BLE001
       last = exc
+      detail = str(exc).strip().replace("\n", " ")[:400]
+
+      if _is_permanent(exc):
+        raise RuntimeError(
+            f"Vertex call failed and will not succeed on retry: {detail}"
+        ) from exc
+
       if i == attempts - 1:
         break
       delay = base_delay * (2**i)
-      log.warning("Retrying after %s in %.1fs", type(exc).__name__, delay)
+      log.warning("Retrying after %s in %.1fs: %s",
+                  type(exc).__name__, delay, detail)
       time.sleep(delay)
-  raise RuntimeError(f"Vertex call failed after {attempts} attempts") from last
+
+  detail = str(last).strip().replace("\n", " ")[:400] if last else "no detail"
+  raise RuntimeError(
+      f"Vertex call failed after {attempts} attempts: {detail}"
+  ) from last
+
+
+# Substrings that mean the request is wrong, not that the service is busy.
+# Retrying these wastes seven seconds and then reports nothing useful.
+_PERMANENT_MARKERS = (
+    "was not found",
+    "does not exist",
+    "permission_denied",
+    "permission denied",
+    "has not been used in project",
+    "is not enabled",
+    "api_key_invalid",
+    "invalid_argument",
+    "unauthenticated",
+    "billing",
+    "not supported",
+    "publisher model",
+)
+
+
+def _is_permanent(exc: Exception) -> bool:
+  text = str(exc).lower()
+  if any(marker in text for marker in _PERMANENT_MARKERS):
+    # A 429 can mention quota alongside these words; quota is retryable.
+    return "resource_exhausted" not in text and "rate limit" not in text
+  return False
 
 
 # ---------------------------------------------------------------------------
