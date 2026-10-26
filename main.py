@@ -1,135 +1,266 @@
-from contextlib import contextmanager
-import datetime
-import sqlite3
-import subprocess
-import sys
-from typing import Optional
+"""FastAPI backend.
 
-from chains import evaluate_student_multi_turn, generate_flaw
+Rewired from ChromaDB + Groq + SQLite onto Atlas + Vertex. Four changes
+worth knowing about beyond the provider swap:
+
+  * `/api/evaluate` now passes the concept through. The previous version
+    called the evaluator with four positional arguments and never supplied
+    `concept`, so every evaluation ran under the default
+    "Computer Science Logic" -- which also meant no concept-scoped
+    retrieval was possible even once a corpus existed.
+  * responses carry the sources the critic was given and the ids it cited,
+    so the retrieval is inspectable from the client rather than only in
+    the server log.
+  * interactions are written to Atlas with a student id. The old schema
+    had none, which is why the migrated history is all under "legacy".
+  * `/api/run` goes through `socratic.execute`, which is better hardened
+    than the previous bare `subprocess.run` and still explicitly not a
+    security boundary. See that module's docstring before exposing this
+    service to anyone.
+
+Run with:  uvicorn main:app --reload --port 8000
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any, Optional
+
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-app = FastAPI()
+from socratic import config, db, execute, history, retrieval, tutor, vertex
 
-DB_PATH = "evaluator.db"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+)
+log = logging.getLogger("socratic.api")
 
-
-@contextmanager
-def get_db_cursor():
-  conn = sqlite3.connect(DB_PATH)
-  cursor = conn.cursor()
-  try:
-    yield cursor
-    conn.commit()
-  finally:
-    conn.close()
-
-
-def init_db():
-  with get_db_cursor() as cursor:
-    cursor.execute("""
-            CREATE TABLE IF NOT EXISTS interactions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                concept TEXT,
-                is_correct BOOLEAN,
-                attempts INTEGER,
-                timestamp TEXT
-            )
-        """)
+app = FastAPI(
+    title="AI Socratic Evaluator",
+    description=(
+        "Socratic debugging tutor over two retrieval pipelines: Atlas Vector "
+        "Search for CS explanations, structured Atlas queries for the "
+        "misconception taxonomy and student history."
+    ),
+    version="2.0.0",
+)
 
 
-init_db()
-
-
+# ---------------------------------------------------------------------------
+# Request models
+# ---------------------------------------------------------------------------
 class ConceptRequest(BaseModel):
   concept: str
 
 
 class RunRequest(BaseModel):
   flawed_code: str
-  test_script: str
+  test_script: str = ""
 
 
 class EvalRequest(BaseModel):
   concept: str
-  flawed_code: str
+  flawed_code: str = ""
   original_code: Optional[str] = ""
   current_code: Optional[str] = ""
-  chat_history: list[dict]
-  attempt_count: int
+  chat_history: list[dict] = Field(default_factory=list)
+  attempt_count: int = 1
   expected_fix: Optional[str] = ""
+  # Supplied by the client so history accumulates per student instead of
+  # all landing under one id as the legacy rows did.
+  student_id: Optional[str] = None
+  session_id: Optional[str] = None
 
 
+class SearchRequest(BaseModel):
+  query: str
+  concept: Optional[str] = None
+  k: int = config.DEFAULT_K
+
+
+# ---------------------------------------------------------------------------
+# Health and introspection
+# ---------------------------------------------------------------------------
+@app.get("/api/health")
+def api_health() -> dict[str, Any]:
+  """Is everything this service depends on actually reachable?
+
+  Checked rather than assumed: an empty `cs_chunks` or a vector index that
+  is not queryable both present as retrieval silently returning nothing.
+  """
+  status: dict[str, Any] = {"ok": True}
+
+  try:
+    status["mongo"] = db.ping()
+  except Exception as exc:  # noqa: BLE001
+    status["ok"] = False
+    status["mongo"] = {"ok": False, "error": str(exc)}
+
+  try:
+    status["corpus"] = retrieval.corpus_stats()
+    if status["corpus"]["chunks"] == 0:
+      status["ok"] = False
+      status["corpus"]["warning"] = (
+          "cs_chunks is empty; run scripts.build_corpus then "
+          "scripts.ingest_corpus"
+      )
+  except Exception as exc:  # noqa: BLE001
+    status["ok"] = False
+    status["corpus"] = {"error": str(exc)}
+
+  try:
+    indexes = [
+        {"name": i.get("name"), "queryable": i.get("queryable"),
+         "status": i.get("status")}
+        for i in db.chunks().list_search_indexes()
+    ]
+    status["search_indexes"] = indexes
+    if not any(i["queryable"] for i in indexes):
+      status["ok"] = False
+  except Exception as exc:  # noqa: BLE001
+    status["search_indexes"] = {"error": str(exc)}
+
+  status["models"] = {
+      "generation": config.GEN_MODEL,
+      "embedding": f"{config.EMBED_MODEL}@{config.EMBED_DIM}",
+      "location": config.GCP_LOCATION,
+  }
+  return status
+
+
+@app.get("/api/concepts")
+def api_concepts() -> dict[str, Any]:
+  """Concepts the taxonomy can actually generate an exercise for.
+
+  The client's topic selector offers 22; the taxonomy has 11. Returning
+  both lists lets the UI mark the difference instead of offering topics
+  that fail on generation.
+  """
+  available = sorted(db.misconceptions().distinct("concept"))
+  return {
+      "available": available,
+      "count": len(available),
+      "corpus_concepts": sorted(
+          c for c in db.chunks().distinct("concept_tags") if c
+      ),
+  }
+
+
+# ---------------------------------------------------------------------------
+# Exercise generation -- structured path
+# ---------------------------------------------------------------------------
 @app.post("/api/generate")
-def api_generate(req: ConceptRequest):
+def api_generate(req: ConceptRequest) -> dict[str, Any]:
+  usage = vertex.Usage()
   try:
-    data = generate_flaw(req.concept)
-    return data
-  except Exception as e:
-    print(f"❌ Error in /api/generate: {e}")
-    raise HTTPException(status_code=500, detail=str(e))
+    exercise = tutor.generate_flaw(req.concept, usage=usage)
+  except tutor.ConceptNotInTaxonomy as exc:
+    # 422, not 500: the request named something the taxonomy does not
+    # cover, which is a client-correctable problem and worth saying so.
+    raise HTTPException(
+        status_code=422,
+        detail={
+            "error": "concept_not_in_taxonomy",
+            "concept": exc.concept,
+            "available": sorted(exc.available),
+            "message": str(exc),
+        },
+    ) from exc
+  except Exception as exc:  # noqa: BLE001
+    log.exception("generate failed for %r", req.concept)
+    raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+  payload = exercise.to_dict()
+  payload["usage"] = usage.summary()
+  return payload
 
 
+# ---------------------------------------------------------------------------
+# Code execution
+# ---------------------------------------------------------------------------
 @app.post("/api/run")
-def run_code(request: RunRequest):
-  combined_code = f"{request.flawed_code}\n\n{request.test_script}"
-
-  try:
-    result = subprocess.run(
-        [sys.executable, "-c", combined_code],
-        capture_output=True,
-        text=True,
-        timeout=3,
-    )
-
-    output = result.stdout
-    if result.stderr:
-      output += f"\n⚠️ Runtime Error:\n{result.stderr}"
-
-    if not output.strip():
-      output = "Execution finished with no stdout output."
-
-    return {"output": output}
-
-  except subprocess.TimeoutExpired:
-    return {
-        "output": (
-            "⏱️ Execution Timed Out! (An infinite loop was detected in your"
-            " code)"
-        )
-    }
-  except Exception as e:
-    return {"output": f"⚠️ Execution Error: {e}"}
+def api_run(req: RunRequest) -> dict[str, Any]:
+  result = execute.run_student_code(req.flawed_code, req.test_script)
+  return result.to_dict()
 
 
+# ---------------------------------------------------------------------------
+# Evaluation -- both paths
+# ---------------------------------------------------------------------------
 @app.post("/api/evaluate")
-def api_evaluate(req: EvalRequest):
+def api_evaluate(req: EvalRequest) -> dict[str, Any]:
+  active_code = req.current_code or req.flawed_code
+  if not active_code.strip():
+    raise HTTPException(
+        status_code=422, detail="No code supplied to evaluate.")
+
+  usage = vertex.Usage()
   try:
-    active_code = req.current_code or req.flawed_code
-    print(
-        f"\n--- DEBUG: Evaluator received code length:"
-        f" {len(active_code)} ---\n{active_code}\n--------------------\n"
-    )
-    evaluation = evaluate_student_multi_turn(
+    evaluation = tutor.evaluate_student(
         active_code,
         req.chat_history,
         req.attempt_count,
-        req.expected_fix or "",
+        concept=req.concept,
+        expected_fix=req.expected_fix or "",
+        usage=usage,
     )
+  except Exception as exc:  # noqa: BLE001
+    log.exception("evaluate failed for %r", req.concept)
+    raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    with get_db_cursor() as cursor:
-      cursor.execute(
-          "INSERT INTO interactions (concept, is_correct, attempts, timestamp)"
-          " VALUES (?, ?, ?, ?)",
-          (
-              req.concept,
-              bool(evaluation.get("is_correct", False)),
-              req.attempt_count,
-              str(datetime.datetime.now()),
-          ),
-      )
+  history.log_interaction(
+      concept=req.concept,
+      is_correct=evaluation.is_correct,
+      attempts=req.attempt_count,
+      student_id=req.student_id or "anonymous",
+      session_id=req.session_id,
+      citations=evaluation.valid_citations,
+      invalid_citations=evaluation.invalid_citations,
+      grounded=evaluation.grounded,
+      passage_count=len(evaluation.passages),
+      usage=usage.summary(),
+  )
 
-    return evaluation
-  except Exception as e:
-    print(f"❌ Error in /api/evaluate: {e}")
-    raise HTTPException(status_code=500, detail=str(e))
+  if evaluation.invalid_citations:
+    # The critic named a passage that was never in its prompt. Worth a log
+    # line: it is the signal that grounding is slipping, and it is
+    # invisible from the client unless something records it.
+    log.warning(
+        "Evaluation cited %d id(s) that were not supplied: %s",
+        len(evaluation.invalid_citations), evaluation.invalid_citations)
+
+  return evaluation.to_dict()
+
+
+# ---------------------------------------------------------------------------
+# Retrieval, exposed directly
+# ---------------------------------------------------------------------------
+@app.post("/api/search")
+def api_search(req: SearchRequest) -> dict[str, Any]:
+  """Path A on its own, so the retrieval can be inspected without a tutor turn."""
+  try:
+    passages = retrieval.semantic_search(
+        req.query, k=req.k, concept=req.concept)
+  except Exception as exc:  # noqa: BLE001
+    log.exception("search failed")
+    raise HTTPException(status_code=500, detail=str(exc)) from exc
+  return {
+      "query": req.query,
+      "concept": req.concept,
+      "count": len(passages),
+      "passages": [p.to_dict() for p in passages],
+  }
+
+
+@app.get("/api/history/{student_id}")
+def api_history(student_id: str, concept: Optional[str] = None) -> dict[str, Any]:
+  """Path B on its own: aggregation over records, no embeddings involved."""
+  try:
+    summary = retrieval.student_concept_history(student_id, concept)
+    summary["weakest"] = retrieval.weakest_concepts(student_id)
+    return summary
+  except Exception as exc:  # noqa: BLE001
+    log.exception("history failed for %r", student_id)
+    raise HTTPException(status_code=500, detail=str(exc)) from exc

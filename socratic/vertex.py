@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import math
 import time
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Sequence
 
@@ -258,4 +259,52 @@ def generate(
         getattr(meta, "candidates_token_count", 0) or 0,
         elapsed_ms,
     )
-  return resp.text or ""
+  return _extract_text(resp)
+
+
+def _extract_text(resp: Any) -> str:
+  """Concatenate the answer parts, leaving out the model's thinking.
+
+  Gemini 3.x returns reasoning as extra parts alongside the answer. The
+  SDK's `.text` accessor concatenates only the text parts but warns every
+  time it has to skip something ("there are non-text parts in the
+  response: ['thought_signature']"), which would print on every tutor turn
+  and end up in the user's terminal. Walking the parts ourselves gets the
+  same string without the noise, and lets a blocked or truncated response
+  raise instead of silently returning "".
+  """
+  candidates = getattr(resp, "candidates", None) or []
+
+  for candidate in candidates:
+    content = getattr(candidate, "content", None)
+    parts = getattr(content, "parts", None) or []
+    collected = [
+        part.text
+        for part in parts
+        if getattr(part, "text", None) and not getattr(part, "thought", False)
+    ]
+    if collected:
+      return "".join(collected)
+
+  # No text came back. That is usually a safety block or a token-limit
+  # truncation, and both are worth surfacing rather than returning empty.
+  reason = None
+  if candidates:
+    reason = getattr(candidates[0], "finish_reason", None)
+  feedback = getattr(resp, "prompt_feedback", None)
+  blocked = getattr(feedback, "block_reason", None) if feedback else None
+
+  with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    fallback = getattr(resp, "text", None) or ""
+  if fallback:
+    return fallback
+
+  detail = ", ".join(
+      f"{label}={value}"
+      for label, value in (("finish_reason", reason), ("block_reason", blocked))
+      if value is not None
+  )
+  raise RuntimeError(
+      "Model returned no text" + (f" ({detail})" if detail else "")
+  )
