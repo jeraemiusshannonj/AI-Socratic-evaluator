@@ -62,11 +62,53 @@ ALL_CONCEPTS = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Streamlit version compatibility
+# ---------------------------------------------------------------------------
+# Streamlit renamed or added most of the API used below between 1.18 and
+# 1.24, and a Python 3.9 environment resolves to something older than that.
+# Rather than pin a floor that forces an interpreter upgrade mid-project,
+# each newer call has a fallback. Every one of these degrades the look and
+# none of them changes behaviour.
 def safe_rerun():
   if hasattr(st, "rerun"):
     st.rerun()
   elif hasattr(st, "experimental_rerun"):
     st.experimental_rerun()
+
+
+def cache_for(ttl: int):
+  """st.cache_data (1.18+), then st.cache (older), then no caching."""
+  if hasattr(st, "cache_data"):
+    return st.cache_data(ttl=ttl)
+  if hasattr(st, "cache"):
+    return st.cache(ttl=ttl, allow_output_mutation=True, show_spinner=False)
+  return lambda fn: fn
+
+
+def divider():
+  """st.divider is 1.23+."""
+  renderer = getattr(st, "divider", None)
+  if renderer is not None:
+    renderer()
+  else:
+    st.markdown("---")
+
+
+class _PlainMessage:
+  """Stand-in for st.chat_message (1.24+) that just renders inline."""
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *exc):
+    return False
+
+
+def chat_message(role: str):
+  if hasattr(st, "chat_message"):
+    return st.chat_message(role)
+  return _PlainMessage()
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +138,7 @@ if "session_id" not in st.session_state:
   st.session_state.session_id = uuid.uuid4().hex[:16]
 
 
-@st.cache_data(ttl=60)
+@cache_for(60)
 def fetch_available_concepts() -> tuple[list[str], str]:
   """Which concepts the taxonomy can actually generate an exercise for."""
   try:
@@ -221,7 +263,7 @@ with st.sidebar:
     st.session_state.last_sources = []
     safe_rerun()
 
-  st.divider()
+  divider()
   st.caption(f"Active concept: {st.session_state.selected_concept}")
   st.caption(f"Attempt: {st.session_state.attempt_count}")
   if available:
@@ -301,7 +343,7 @@ with col_chat:
 
   for message in st.session_state.messages:
     speaker = "You" if message["role"] == "user" else "Tutor"
-    with st.chat_message(
+    with chat_message(
         "user" if message["role"] == "user" else "assistant"
     ):
       st.markdown(f"**{speaker}:** {message['content']}")
@@ -379,4 +421,4 @@ with col_chat:
           st.caption(source["section"])
         if source.get("url"):
           st.caption(f"[{source['chunk_id']}]({source['url']})")
-        st.divider()
+        divider()
