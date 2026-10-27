@@ -1,0 +1,66 @@
+{
+  "generated_at": "2026-10-27T05:58:59Z",
+  "models": {
+    "generation": "gemini-3.8-flash",
+    "embedding": "gemini-embedding-001",
+    "dimensions": 768,
+    "location": "global"
+  },
+  "k": 5,
+  "corpus": {
+    "chunks": 504,
+    "misconceptions": 22,
+    "interactions": 115,
+    "test_cases": 79,
+    "distinct_concepts": 23,
+    "distinct_sources": 54,
+    "licenses": [
+      "MIT",
+      "PSF-2.0"
+    ],
+    "interactions_since": "2021-10-28T05:58:59.126855+00:00"
+  },
+  "retrieval": {
+    "filtered": {
+      "questions": 28,
+      "hit_at_1": 26,
+      "hit_at_k": 28,
+      "hit_at_1_rate": 0.929,
+      "hit_at_k_rate": 1.0,
+      "p50_latency_ms": 190.0,
+      "misses": []
+    },
+    "unfiltered": {
+      "questions": 28,
+      "hit_at_1": 25,
+      "hit_at_k": 28,
+      "hit_at_1_rate": 0.893,
+      "hit_at_k_rate": 1.0,
+      "p50_latency_ms": 172.1,
+      "misses": []
+    }
+  },
+  "critic": {
+    "evaluations": 44,
+    "verdict_correct": 44,
+    "verdict_accuracy": 1.0,
+    "model_agreement": 1.0,
+    "model_judged_on": 44,
+    "grounded": 41,
+    "grounded_rate": 0.932,
+    "citations_total": 52,
+    "citations_fabricated": 0,
+    "citation_validity": 1.0,
+    "disagreements": [],
+    "fabrications": []
+  },
+  "usage": {
+    "calls": 44,
+    "prompt_tokens": 69248,
+    "output_tokens": 7177,
+    "total_tokens": 76425,
+    "tokens_per_sec": 76.6,
+    "p50_latency_ms": 5728.3,
+    "p95_latency_ms": 50684.5
+  }
+}
