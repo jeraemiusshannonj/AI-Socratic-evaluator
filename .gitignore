@@ -24,3 +24,6 @@ chroma_db/
 # of three upstream documentation projects.
 corpus/_sources/
 corpus/_build/
+
+# patch files produced while iterating; never part of the project
+*.patch

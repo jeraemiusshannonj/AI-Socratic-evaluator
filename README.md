@@ -53,7 +53,7 @@ honestly answer it (2.4 on average).
 | with concept filter | 93% (26/28) | 100% (28/28) |
 | **without concept filter** | **89% (25/28)** | **100% (28/28)** |
 
-Median query latency **277 ms**, embedding included.
+Median query latency **208 ms**, embedding included.
 
 The unfiltered row is the one worth quoting. Dropping the metadata filter
 costs four points, so the embeddings are carrying retrieval and the
@@ -113,9 +113,19 @@ misconception, for each of the 22 concepts
 |---|---|
 | verdict correct | 44/44 |
 | the model's reading agreed with the test run | 44/44 |
-| cited a passage it was actually given | 42/44 |
-| citations made | 55 |
+| cited a passage it was actually given | 39/44 |
+| cited nothing | 5/44 |
+| citations made | 51 |
 | citations referring to a passage never supplied | **0** |
+
+Groundedness was 42/44 before the critic could record that retrieved
+passages do not bear on a question. Allowing that judgement moved it to
+39/44, because five evaluations now decline to cite rather than reach for
+the nearest passage. Whether all five are honest declines or some are a
+grounding failure wearing the same clothes is not something this table can
+tell you, so the harness reports the split (`declined_material_irrelevant`
+against `uncited_unexplained`) and the unexplained ones are worth reading
+by hand.
 
 Verdict accuracy mostly measures the test cases, since the verdict comes
 from them. The agreement figure needs a caveat: these 44 implementations
@@ -127,11 +137,11 @@ claim is that it agreed on all 44 unambiguous cases.
 
 | | |
 |---|---|
-| calls in a full eval run | 105 |
-| tokens | 126,398 in / 10,797 out |
-| throughput | 208 tokens/sec |
-| p50 latency | 5.7 s |
-| p95 latency | 21.5 s |
+| calls in a full eval run | 92 |
+| tokens | 108,557 in / 10,555 out |
+| throughput | 196.9 tokens/sec |
+| p50 latency | 5.9 s |
+| p95 latency | 15.1 s |
 
 Cost per request is computed only when `PRICE_PER_1M_INPUT_TOKENS` and
 `PRICE_PER_1M_OUTPUT_TOKENS` are set in `.env`. Those are not hardcoded
@@ -320,7 +330,7 @@ Google's address pool, so the access list is `0.0.0.0/0` and the database
 credentials are the only protection. A static egress IP needs a VPC
 connector and Cloud NAT, neither free.
 
-**p95 latency is 21.5 s** against a p50 of 5.7. Gemini 3.x reasons before
+**p95 latency is 15.1 s** against a p50 of 5.9. Gemini 3.x reasons before
 answering with no budget set, and the embedding call and taxonomy lookup
 run serially when they could overlap.
 

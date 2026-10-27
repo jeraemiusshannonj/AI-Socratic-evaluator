@@ -123,6 +123,10 @@ class CriticOutcome:
   model_judged: int = 0
   grounded: int = 0
   with_passages: int = 0
+  # Cited nothing because it judged the passages not to bear on the
+  # question. Tracked apart from `grounded` so the gap between the two
+  # is visible instead of looking like a grounding failure.
+  declined: int = 0
   fabricated_citations: int = 0
   total_citations: int = 0
   disagreements: list[dict] = field(default_factory=list)
@@ -140,6 +144,9 @@ class CriticOutcome:
         "grounded": self.grounded,
         "grounded_rate": round(self.grounded / self.with_passages, 3)
                          if self.with_passages else None,
+        "declined_material_irrelevant": self.declined,
+        "uncited_unexplained": self.with_passages - self.grounded
+                               - self.declined,
         "citations_total": self.total_citations,
         "citations_fabricated": self.fabricated_citations,
         "citation_validity": round(
@@ -191,6 +198,8 @@ def run_critic(
         outcome.with_passages += 1
         if result.grounded:
           outcome.grounded += 1
+        elif result.declined:
+          outcome.declined += 1
 
       outcome.total_citations += len(result.citations)
       outcome.fabricated_citations += len(result.invalid_citations)
@@ -452,6 +461,13 @@ def main() -> int:
     if outcome.with_passages:
       print(f"  cited a real passage "
             f"{_pct(outcome.grounded, outcome.with_passages)}")
+      uncited = outcome.with_passages - outcome.grounded
+      if uncited:
+        unexplained = uncited - outcome.declined
+        print(f"    of the {uncited} that cited nothing: "
+              f"{outcome.declined} judged the passages irrelevant, "
+              f"{unexplained} unexplained"
+              f"{' (worth reading)' if unexplained else ''}")
     print(f"  citations {outcome.total_citations}, "
           f"fabricated {outcome.fabricated_citations}")
 
