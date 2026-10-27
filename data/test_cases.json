@@ -1,0 +1,1045 @@
+{
+  "_comment": [
+    "Executable test cases, one group per concept in misconceptions.csv.",
+    "Each group contains at least one case chosen specifically to fail on",
+    "that concept's misconception and pass on a correct implementation --",
+    "the `rationale` field says which one that is and why. The remaining",
+    "cases are ordinary correctness checks so a fix that breaks something",
+    "else does not read as a success.",
+    "",
+    "`call` is evaluated in the namespace the student's code defines, so a",
+    "case can exercise a class or a sqlite3 connection, not only a plain",
+    "function. Tuples are normalised to lists in the call expression where",
+    "needed, because the expected values come from JSON and JSON has no",
+    "tuple."
+  ],
+  "cases": [
+    {
+      "concept": "Linear Search",
+      "name": "target at the first position",
+      "call": "linear_search([10, 20, 30], 10)",
+      "expected": true,
+      "kind": "value",
+      "rationale": "Passes even with the bug. Present so a fix cannot be claimed from this case alone."
+    },
+    {
+      "concept": "Linear Search",
+      "name": "target at the last position",
+      "call": "linear_search([10, 20, 30], 30)",
+      "expected": true,
+      "kind": "value",
+      "rationale": "Catches the misconception: returning False inside the loop gives up after index 0."
+    },
+    {
+      "concept": "Linear Search",
+      "name": "target absent",
+      "call": "linear_search([10, 20, 30], 99)",
+      "expected": false,
+      "kind": "value",
+      "rationale": "A fix that always returns True would pass the first two cases."
+    },
+    {
+      "concept": "Linear Search",
+      "name": "empty list",
+      "call": "linear_search([], 1)",
+      "expected": false,
+      "kind": "value",
+      "rationale": "Boundary: no iterations at all."
+    },
+    {
+      "concept": "Binary Search (Off-by-One)",
+      "name": "target in the middle",
+      "call": "binary_search([1, 3, 5, 7, 9], 5)",
+      "expected": 2,
+      "kind": "value",
+      "rationale": "Found on the first probe, so it passes with the bug present."
+    },
+    {
+      "concept": "Binary Search (Off-by-One)",
+      "name": "absent target terminates",
+      "call": "binary_search([1, 3, 5, 7, 9], 4)",
+      "expected": -1,
+      "kind": "value",
+      "isolate": true,
+      "rationale": "Catches the misconception: with high = mid the window stops shrinking once it holds two elements and the loop never ends. Isolated so the hang does not take the batch with it."
+    },
+    {
+      "concept": "Binary Search (Off-by-One)",
+      "name": "first element",
+      "call": "binary_search([1, 3, 5, 7, 9], 1)",
+      "expected": 0,
+      "kind": "value",
+      "isolate": true,
+      "rationale": "Drives the window down to the low end, where the off-by-one shows."
+    },
+    {
+      "concept": "Binary Search (Off-by-One)",
+      "name": "last element",
+      "call": "binary_search([1, 3, 5, 7, 9], 9)",
+      "expected": 4,
+      "kind": "value",
+      "rationale": "Drives the window to the high end."
+    },
+    {
+      "concept": "Binary Search (Loop Condition)",
+      "name": "single-element list",
+      "call": "binary_search([5], 5)",
+      "expected": 0,
+      "kind": "value",
+      "rationale": "Catches the misconception: with while low < high and low == high == 0 the body never runs, so the only candidate is never compared."
+    },
+    {
+      "concept": "Binary Search (Loop Condition)",
+      "name": "last element",
+      "call": "binary_search([1, 3, 5, 7, 9], 9)",
+      "expected": 4,
+      "kind": "value",
+      "rationale": "The search narrows to a single remaining candidate, which the strict comparison skips."
+    },
+    {
+      "concept": "Binary Search (Loop Condition)",
+      "name": "target in the middle",
+      "call": "binary_search([1, 3, 5, 7, 9], 5)",
+      "expected": 2,
+      "kind": "value",
+      "rationale": "Ordinary case; passes with the bug."
+    },
+    {
+      "concept": "Binary Search (Loop Condition)",
+      "name": "absent target",
+      "call": "binary_search([1, 3, 5, 7, 9], 4)",
+      "expected": -1,
+      "kind": "value",
+      "isolate": true,
+      "rationale": "A fix that returns low instead of -1 would fail here."
+    },
+    {
+      "concept": "Binary Search (Prerequisite)",
+      "name": "unsorted input returns the original index",
+      "call": "search_any_order([30, 10, 20], 10)",
+      "expected": 1,
+      "kind": "value",
+      "rationale": "Catches the misconception: sorting a copy puts 10 at index 0, but in the caller's list it is at index 1."
+    },
+    {
+      "concept": "Binary Search (Prerequisite)",
+      "name": "already-sorted input",
+      "call": "search_any_order([10, 20, 30], 30)",
+      "expected": 2,
+      "kind": "value",
+      "rationale": "Passes with the bug, because sorting changes nothing here."
+    },
+    {
+      "concept": "Binary Search (Prerequisite)",
+      "name": "input is not modified",
+      "setup": "src = [30, 10, 20]",
+      "call": "[search_any_order(src, 20), src]",
+      "expected": [
+        2,
+        [
+          30,
+          10,
+          20
+        ]
+      ],
+      "kind": "value",
+      "rationale": "Sorting the caller's list in place rather than a copy is the other half of this mistake."
+    },
+    {
+      "concept": "Binary Search (Prerequisite)",
+      "name": "absent target",
+      "call": "search_any_order([30, 10, 20], 99)",
+      "expected": -1,
+      "kind": "value",
+      "rationale": "Boundary."
+    },
+    {
+      "concept": "Bubble Sort (Early Exit)",
+      "name": "sorts a shuffled list",
+      "call": "bubble_sort([3, 1, 2])",
+      "expected": [
+        1,
+        2,
+        3
+      ],
+      "kind": "value",
+      "rationale": "Correctness. Passes with the bug, which costs time rather than accuracy."
+    },
+    {
+      "concept": "Bubble Sort (Early Exit)",
+      "name": "already-sorted input exits early",
+      "setup": "data = CountingList(list(range(40)))",
+      "call": "bubble_sort(data)",
+      "expected": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "kind": "operations",
+      "counts_from": "data",
+      "reads_under": 400,
+      "rationale": "Catches the misconception. On 40 already-sorted elements one pass reads about 80 times; without the swapped flag it reads about 3100. The returned list is identical either way, so this is the only way to see the difference."
+    },
+    {
+      "concept": "Bubble Sort (Early Exit)",
+      "name": "reversed input",
+      "call": "bubble_sort([5, 4, 3, 2, 1])",
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "kind": "value",
+      "rationale": "Worst case: the early exit must not fire before the list is actually sorted."
+    },
+    {
+      "concept": "Bubble Sort (Early Exit)",
+      "name": "duplicates",
+      "call": "bubble_sort([2, 1, 2, 1])",
+      "expected": [
+        1,
+        1,
+        2,
+        2
+      ],
+      "kind": "value",
+      "rationale": "Equal elements must not be treated as needing a swap, which would stop the early exit ever firing."
+    },
+    {
+      "concept": "Selection Sort (Min Index Swap)",
+      "name": "sorts a shuffled list",
+      "call": "selection_sort([64, 25, 12, 22, 11])",
+      "expected": [
+        11,
+        12,
+        22,
+        25,
+        64
+      ],
+      "kind": "value",
+      "rationale": "Correctness. Swapping inside the inner loop still sorts, so this passes with the bug."
+    },
+    {
+      "concept": "Selection Sort (Min Index Swap)",
+      "name": "one swap per outer pass",
+      "setup": "data = CountingList([20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1])",
+      "call": "selection_sort(data)",
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "kind": "operations",
+      "counts_from": "data",
+      "writes_under": 60,
+      "rationale": "Catches the misconception. Selection sort makes at most n-1 swaps, so about 38 writes for 20 elements; swapping during every comparison instead makes roughly 190 swaps and 380 writes. Both produce the same sorted list."
+    },
+    {
+      "concept": "Selection Sort (Min Index Swap)",
+      "name": "already sorted",
+      "call": "selection_sort([1, 2, 3])",
+      "expected": [
+        1,
+        2,
+        3
+      ],
+      "kind": "value",
+      "rationale": "Must not disturb an ordered list."
+    },
+    {
+      "concept": "Insertion Sort (Shifting Bug)",
+      "name": "sorts a shuffled list",
+      "call": "insertion_sort([5, 2, 4, 6, 1, 3])",
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "kind": "value",
+      "rationale": "Catches the misconception: shifting without saving the key overwrites it, so an element is duplicated and another lost."
+    },
+    {
+      "concept": "Insertion Sort (Shifting Bug)",
+      "name": "reversed input",
+      "call": "insertion_sort([5, 4, 3, 2, 1])",
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "kind": "value",
+      "rationale": "Every element shifts the full distance, which is where an off-by-one in the insert position shows."
+    },
+    {
+      "concept": "Insertion Sort (Shifting Bug)",
+      "name": "no elements are lost",
+      "call": "sorted(insertion_sort([3, 1, 3, 1])) == [1, 1, 3, 3]",
+      "expected": true,
+      "kind": "value",
+      "rationale": "The shifting bug duplicates values. Comparing the multiset catches that even if the order happens to look right."
+    },
+    {
+      "concept": "Insertion Sort (Shifting Bug)",
+      "name": "single element",
+      "call": "insertion_sort([7])",
+      "expected": [
+        7
+      ],
+      "kind": "value",
+      "rationale": "Boundary: the inner loop never runs."
+    },
+    {
+      "concept": "Merge Sort (Slice Overhead)",
+      "name": "sorts a shuffled list",
+      "call": "merge_sort([38, 27, 43, 3, 9, 82, 10])",
+      "expected": [
+        3,
+        9,
+        10,
+        27,
+        38,
+        43,
+        82
+      ],
+      "kind": "value",
+      "rationale": "Correctness. This misconception is about memory, not output, so no value case can catch it -- see the in-place case below."
+    },
+    {
+      "concept": "Merge Sort (Slice Overhead)",
+      "name": "sorts in place rather than returning a fresh list",
+      "setup": "src = [4, 2, 3, 1]",
+      "call": "[merge_sort(src), src]",
+      "expected": [
+        [
+          1,
+          2,
+          3,
+          4
+        ],
+        [
+          1,
+          2,
+          3,
+          4
+        ]
+      ],
+      "kind": "value",
+      "rationale": "Catches what is catchable: an implementation built on arr[:mid] slices returns a new list and leaves the caller's list untouched, so the second element of this pair stays unsorted."
+    },
+    {
+      "concept": "Merge Sort (Slice Overhead)",
+      "name": "duplicates are kept",
+      "call": "merge_sort([2, 1, 2, 1])",
+      "expected": [
+        1,
+        1,
+        2,
+        2
+      ],
+      "kind": "value",
+      "rationale": "Merging must not drop equal elements."
+    },
+    {
+      "concept": "Merge Sort (Two-Pointer Comparison)",
+      "name": "interleaved halves",
+      "call": "merge_sort([5, 1, 6, 2, 7, 3])",
+      "expected": [
+        1,
+        2,
+        3,
+        5,
+        6,
+        7
+      ],
+      "kind": "value",
+      "isolate": true,
+      "rationale": "Catches the misconception: if the sub-array pointer never advances, the same element is written repeatedly and the merge either loops forever or fills the output with one value."
+    },
+    {
+      "concept": "Merge Sort (Two-Pointer Comparison)",
+      "name": "no elements are lost or duplicated",
+      "call": "sorted(merge_sort([4, 1, 3, 2])) == [1, 2, 3, 4]",
+      "expected": true,
+      "kind": "value",
+      "isolate": true,
+      "rationale": "Duplicate writes show up as a changed multiset even when the result is ordered."
+    },
+    {
+      "concept": "Merge Sort (Two-Pointer Comparison)",
+      "name": "already sorted",
+      "call": "merge_sort([1, 2, 3, 4])",
+      "expected": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "kind": "value",
+      "isolate": true,
+      "rationale": "One side exhausts first, which is where the tail copy is usually wrong."
+    },
+    {
+      "concept": "Quick Sort (Partition Off-By-One)",
+      "name": "sorts a shuffled list",
+      "call": "quick_sort([3, 6, 1, 8, 2, 9])",
+      "expected": [
+        1,
+        2,
+        3,
+        6,
+        8,
+        9
+      ],
+      "kind": "value",
+      "isolate": true,
+      "rationale": "Catches the misconception: including the pivot in both halves means a sub-array never shrinks, so the recursion repeats until Python raises RecursionError."
+    },
+    {
+      "concept": "Quick Sort (Partition Off-By-One)",
+      "name": "already-sorted input",
+      "call": "quick_sort([1, 2, 3, 4, 5])",
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "kind": "value",
+      "isolate": true,
+      "rationale": "The worst case for a last-element pivot, and the fastest way to exhaust the stack if the bounds are wrong."
+    },
+    {
+      "concept": "Quick Sort (Partition Off-By-One)",
+      "name": "two elements",
+      "call": "quick_sort([2, 1])",
+      "expected": [
+        1,
+        2
+      ],
+      "kind": "value",
+      "isolate": true,
+      "rationale": "The smallest input where a sub-array can fail to shrink."
+    },
+    {
+      "concept": "Quick Sort (Lomuto Partition)",
+      "name": "sorts a shuffled list",
+      "call": "quick_sort([3, 6, 1, 8, 2, 9])",
+      "expected": [
+        1,
+        2,
+        3,
+        6,
+        8,
+        9
+      ],
+      "kind": "value",
+      "isolate": true,
+      "rationale": "Catches the misconception: swapping before advancing the boundary leaves an element on the wrong side of the pivot."
+    },
+    {
+      "concept": "Quick Sort (Lomuto Partition)",
+      "name": "duplicates",
+      "call": "quick_sort([2, 1, 2, 1])",
+      "expected": [
+        1,
+        1,
+        2,
+        2
+      ],
+      "kind": "value",
+      "isolate": true,
+      "rationale": "Equal elements are where an off-by-one boundary most often misplaces a value."
+    },
+    {
+      "concept": "Quick Sort (Lomuto Partition)",
+      "name": "reversed input",
+      "call": "quick_sort([5, 4, 3, 2, 1])",
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "kind": "value",
+      "isolate": true,
+      "rationale": "Every element crosses the boundary."
+    },
+    {
+      "concept": "Heap Sort (0-Indexed Parent/Child)",
+      "name": "three already-sorted elements",
+      "call": "heap_sort([1, 2, 3])",
+      "expected": [
+        1,
+        2,
+        3
+      ],
+      "kind": "value",
+      "rationale": "Catches the misconception. With left = 2*i the root's left child is the root itself, so index 0 is never compared against its real children and the last two elements come back swapped. This is the smallest input that distinguishes the two: most larger inputs happen to sort correctly anyway."
+    },
+    {
+      "concept": "Heap Sort (0-Indexed Parent/Child)",
+      "name": "sorts a shuffled list",
+      "call": "heap_sort([4, 10, 3, 5, 1])",
+      "expected": [
+        1,
+        3,
+        4,
+        5,
+        10
+      ],
+      "kind": "value",
+      "rationale": "Correctness. Passes with the bug: 1-indexed child arithmetic still sorts about 80% of random inputs, which is why this misconception survives casual testing."
+    },
+    {
+      "concept": "Heap Sort (0-Indexed Parent/Child)",
+      "name": "index arithmetic stays in range",
+      "call": "heap_sort([9, 8, 7, 6, 5, 4, 3, 2, 1])",
+      "expected": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "kind": "value",
+      "rationale": "A longer input exercises deeper levels of the heap, where the wrong child index addresses a node outside the sub-heap being sifted."
+    },
+    {
+      "concept": "Heap Sort (0-Indexed Parent/Child)",
+      "name": "duplicates",
+      "call": "heap_sort([2, 1, 2, 1])",
+      "expected": [
+        1,
+        1,
+        2,
+        2
+      ],
+      "kind": "value",
+      "rationale": "Sift-down must handle equal keys without looping."
+    },
+    {
+      "concept": "Graph Traversal (BFS Visited Tracking)",
+      "name": "diamond graph visits each vertex once",
+      "call": "bfs_order({\"A\": [\"B\", \"C\"], \"B\": [\"D\"], \"C\": [\"D\"], \"D\": []}, \"A\")",
+      "expected": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "kind": "value",
+      "rationale": "Catches the misconception: D is reachable from both B and C, so marking visited at dequeue rather than enqueue puts D on the queue twice and reports it twice."
+    },
+    {
+      "concept": "Graph Traversal (BFS Visited Tracking)",
+      "name": "a cycle does not loop forever",
+      "call": "bfs_order({\"A\": [\"B\"], \"B\": [\"A\"]}, \"A\")",
+      "expected": [
+        "A",
+        "B"
+      ],
+      "kind": "value",
+      "isolate": true,
+      "rationale": "No visited tracking at all turns a cycle into an infinite traversal."
+    },
+    {
+      "concept": "Graph Traversal (BFS Visited Tracking)",
+      "name": "breadth-first order is preserved",
+      "call": "bfs_order({\"A\": [\"B\", \"C\"], \"B\": [\"D\"], \"C\": [], \"D\": []}, \"A\")",
+      "expected": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "kind": "value",
+      "rationale": "A fix that switches to a stack would pass the duplicate check and fail here."
+    },
+    {
+      "concept": "Graph Traversal (BFS Visited Tracking)",
+      "name": "isolated start vertex",
+      "call": "bfs_order({\"A\": []}, \"A\")",
+      "expected": [
+        "A"
+      ],
+      "kind": "value",
+      "rationale": "Boundary: no neighbours."
+    },
+    {
+      "concept": "Graph Traversal (DFS Cycle Detection)",
+      "name": "diamond DAG is not a cycle",
+      "call": "has_cycle({\"A\": [\"B\", \"C\"], \"B\": [\"D\"], \"C\": [\"D\"], \"D\": []})",
+      "expected": false,
+      "kind": "value",
+      "rationale": "Catches the misconception: D is reached twice by different paths, and treating any revisit as a cycle reports this acyclic graph as cyclic."
+    },
+    {
+      "concept": "Graph Traversal (DFS Cycle Detection)",
+      "name": "a real cycle is found",
+      "call": "has_cycle({\"A\": [\"B\"], \"B\": [\"C\"], \"C\": [\"A\"]})",
+      "expected": true,
+      "kind": "value",
+      "rationale": "A fix that always returns False would pass the first case."
+    },
+    {
+      "concept": "Graph Traversal (DFS Cycle Detection)",
+      "name": "self loop",
+      "call": "has_cycle({\"A\": [\"A\"]})",
+      "expected": true,
+      "kind": "value",
+      "rationale": "The shortest possible cycle; often missed when the stack check happens before the vertex is pushed."
+    },
+    {
+      "concept": "Graph Traversal (DFS Cycle Detection)",
+      "name": "empty graph",
+      "call": "has_cycle({})",
+      "expected": false,
+      "kind": "value",
+      "rationale": "Boundary."
+    },
+    {
+      "concept": "Recursion",
+      "name": "factorial of zero",
+      "call": "factorial(0)",
+      "expected": 1,
+      "kind": "value",
+      "isolate": true,
+      "rationale": "Catches the misconception: a base case of n == 1 is stepped straight past by n == 0, and the recursion runs until Python raises RecursionError."
+    },
+    {
+      "concept": "Recursion",
+      "name": "factorial of one",
+      "call": "factorial(1)",
+      "expected": 1,
+      "kind": "value",
+      "rationale": "Passes with the bug, since n == 1 is exactly the case the wrong base case handles."
+    },
+    {
+      "concept": "Recursion",
+      "name": "factorial of five",
+      "call": "factorial(5)",
+      "expected": 120,
+      "kind": "value",
+      "rationale": "Ordinary case; also passes with the bug."
+    },
+    {
+      "concept": "Python Lists",
+      "name": "adjacent matches are all removed",
+      "call": "remove_all([1, 2, 2, 3, 2], 2)",
+      "expected": [
+        1,
+        3
+      ],
+      "kind": "value",
+      "rationale": "Catches the misconception: removing while iterating shifts the list under the iterator, so the second 2 is skipped and survives."
+    },
+    {
+      "concept": "Python Lists",
+      "name": "every element matches",
+      "call": "remove_all([2, 2, 2], 2)",
+      "expected": [],
+      "kind": "value",
+      "rationale": "The skip happens on every step, so roughly half the elements remain."
+    },
+    {
+      "concept": "Python Lists",
+      "name": "the caller's list is unchanged",
+      "setup": "src = [1, 2, 3]",
+      "call": "[remove_all(src, 2), src]",
+      "expected": [
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          2,
+          3
+        ]
+      ],
+      "kind": "value",
+      "rationale": "Mutating the argument is the other half of this mistake."
+    },
+    {
+      "concept": "Python Lists",
+      "name": "value not present",
+      "call": "remove_all([1, 3], 2)",
+      "expected": [
+        1,
+        3
+      ],
+      "kind": "value",
+      "rationale": "Boundary: nothing to remove."
+    },
+    {
+      "concept": "Python Default Arguments",
+      "name": "a later call starts from an empty bucket",
+      "setup": "collect(1)",
+      "call": "collect(2)",
+      "expected": [
+        2
+      ],
+      "kind": "value",
+      "rationale": "Catches the misconception: a mutable default is created once at definition time, so the second call returns [1, 2]."
+    },
+    {
+      "concept": "Python Default Arguments",
+      "name": "the first call looks correct",
+      "call": "collect(1)",
+      "expected": [
+        1
+      ],
+      "kind": "value",
+      "rationale": "The bug is invisible on a single call, which is why it survives review."
+    },
+    {
+      "concept": "Python Default Arguments",
+      "name": "three calls stay independent",
+      "setup": "collect('a')\ncollect('b')",
+      "call": "collect('c')",
+      "expected": [
+        "c"
+      ],
+      "kind": "value",
+      "rationale": "Accumulation compounds, so the third call is unambiguous."
+    },
+    {
+      "concept": "Python Default Arguments",
+      "name": "an explicit bucket is appended to",
+      "call": "collect(2, [1])",
+      "expected": [
+        1,
+        2
+      ],
+      "kind": "value",
+      "rationale": "A fix that ignores the parameter and always starts fresh would fail here."
+    },
+    {
+      "concept": "Python Object Mutability",
+      "name": "the caller's list is unchanged",
+      "setup": "src = [1, 2]",
+      "call": "[append_without_mutating(src, 3), src]",
+      "expected": [
+        [
+          1,
+          2,
+          3
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "kind": "value",
+      "rationale": "Catches the misconception: binding the argument to another name does not copy it, so appending is visible through the caller's reference."
+    },
+    {
+      "concept": "Python Object Mutability",
+      "name": "the returned list is correct",
+      "call": "append_without_mutating([1, 2], 3)",
+      "expected": [
+        1,
+        2,
+        3
+      ],
+      "kind": "value",
+      "rationale": "Passes with the bug, because the return value is right either way."
+    },
+    {
+      "concept": "Python Object Mutability",
+      "name": "two calls do not accumulate",
+      "setup": "src = [1]\nfirst = append_without_mutating(src, 2)",
+      "call": "append_without_mutating(src, 3)",
+      "expected": [
+        1,
+        3
+      ],
+      "kind": "value",
+      "rationale": "If the first call mutated src, the second returns [1, 2, 3]."
+    },
+    {
+      "concept": "Python Object Mutability",
+      "name": "empty input",
+      "call": "append_without_mutating([], 1)",
+      "expected": [
+        1
+      ],
+      "kind": "value",
+      "rationale": "Boundary."
+    },
+    {
+      "concept": "Hash Tables",
+      "name": "colliding keys are both kept",
+      "call": "[[list(p) for p in b] for b in build_index([(1, 'a'), (3, 'b')], 2)]",
+      "expected": [
+        [],
+        [
+          [
+            1,
+            "a"
+          ],
+          [
+            3,
+            "b"
+          ]
+        ]
+      ],
+      "kind": "value",
+      "rationale": "Catches the misconception: 1 and 3 both hash to bucket 1, and overwriting instead of chaining loses the first pair. Integer keys are used because string hashing is randomised per process."
+    },
+    {
+      "concept": "Hash Tables",
+      "name": "keys in different buckets",
+      "call": "[[list(p) for p in b] for b in build_index([(1, 'a'), (2, 'b')], 2)]",
+      "expected": [
+        [
+          [
+            2,
+            "b"
+          ]
+        ],
+        [
+          [
+            1,
+            "a"
+          ]
+        ]
+      ],
+      "kind": "value",
+      "rationale": "Passes with the bug, since nothing collides."
+    },
+    {
+      "concept": "Hash Tables",
+      "name": "insertion order within a bucket",
+      "call": "[[list(p) for p in b] for b in build_index([(5, 'x'), (1, 'y'), (3, 'z')], 2)]",
+      "expected": [
+        [],
+        [
+          [
+            5,
+            "x"
+          ],
+          [
+            1,
+            "y"
+          ],
+          [
+            3,
+            "z"
+          ]
+        ]
+      ],
+      "kind": "value",
+      "rationale": "Three-way collision; a fix that prepends instead of appending would fail here."
+    },
+    {
+      "concept": "Hash Tables",
+      "name": "empty input",
+      "call": "build_index([], 3)",
+      "expected": [
+        [],
+        [],
+        []
+      ],
+      "kind": "value",
+      "rationale": "Boundary: the table must still be the requested size."
+    },
+    {
+      "concept": "SQL Left Join",
+      "name": "a customer with no qualifying orders still appears",
+      "setup": "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\"CREATE TABLE customers(id INTEGER, name TEXT); CREATE TABLE orders(id INTEGER, customer_id INTEGER, amount INTEGER); INSERT INTO customers VALUES (1,'Ana'),(2,'Ben'); INSERT INTO orders VALUES (1,1,150),(2,1,200),(3,2,50);\")",
+      "call": "[list(r) for r in customers_with_recent_orders(conn)]",
+      "expected": [
+        [
+          "Ana",
+          350
+        ],
+        [
+          "Ben",
+          0
+        ]
+      ],
+      "kind": "value",
+      "rationale": "Catches the misconception: Ben's only order is 50, so filtering amount > 100 in WHERE removes his NULL-extended row entirely and he vanishes from the result. In the ON clause he survives with a total of 0."
+    },
+    {
+      "concept": "SQL Left Join",
+      "name": "a customer with no orders at all",
+      "setup": "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\"CREATE TABLE customers(id INTEGER, name TEXT); CREATE TABLE orders(id INTEGER, customer_id INTEGER, amount INTEGER); INSERT INTO customers VALUES (1,'Ana'),(2,'Cara'); INSERT INTO orders VALUES (1,1,500);\")",
+      "call": "[list(r) for r in customers_with_recent_orders(conn)]",
+      "expected": [
+        [
+          "Ana",
+          500
+        ],
+        [
+          "Cara",
+          0
+        ]
+      ],
+      "kind": "value",
+      "rationale": "The plain LEFT JOIN case: no matching row at all, so the total must come from COALESCE rather than NULL."
+    },
+    {
+      "concept": "SQL Left Join",
+      "name": "ordered by name",
+      "setup": "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\"CREATE TABLE customers(id INTEGER, name TEXT); CREATE TABLE orders(id INTEGER, customer_id INTEGER, amount INTEGER); INSERT INTO customers VALUES (1,'Zoe'),(2,'Abe'); INSERT INTO orders VALUES (1,1,200),(2,2,300);\")",
+      "call": "[list(r) for r in customers_with_recent_orders(conn)]",
+      "expected": [
+        [
+          "Abe",
+          300
+        ],
+        [
+          "Zoe",
+          200
+        ]
+      ],
+      "kind": "value",
+      "rationale": "The contract specifies an order, so the result must not depend on insertion order."
+    },
+    {
+      "concept": "SQL Group By",
+      "name": "many small orders exceed the threshold together",
+      "setup": "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\"CREATE TABLE customers(id INTEGER, name TEXT); CREATE TABLE orders(id INTEGER, customer_id INTEGER, amount INTEGER); INSERT INTO customers VALUES (1,'Ana'),(2,'Ben'); INSERT INTO orders VALUES (1,1,50),(2,1,50),(3,1,50),(4,2,200);\")",
+      "call": "[list(r) for r in big_spenders(conn)]",
+      "expected": [
+        [
+          "Ana",
+          150
+        ],
+        [
+          "Ben",
+          200
+        ]
+      ],
+      "kind": "value",
+      "rationale": "Catches the misconception: Ana's largest single order is 50, so a WHERE amount > 100 filter drops her even though her total is 150. HAVING runs after grouping and keeps her."
+    },
+    {
+      "concept": "SQL Group By",
+      "name": "a customer below the threshold is excluded",
+      "setup": "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\"CREATE TABLE customers(id INTEGER, name TEXT); CREATE TABLE orders(id INTEGER, customer_id INTEGER, amount INTEGER); INSERT INTO customers VALUES (1,'Ana'),(2,'Ben'); INSERT INTO orders VALUES (1,1,300),(2,2,40);\")",
+      "call": "[list(r) for r in big_spenders(conn)]",
+      "expected": [
+        [
+          "Ana",
+          300
+        ]
+      ],
+      "kind": "value",
+      "rationale": "A fix that drops the filter altogether would return Ben too."
+    },
+    {
+      "concept": "SQL Group By",
+      "name": "exactly at the threshold is excluded",
+      "setup": "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\"CREATE TABLE customers(id INTEGER, name TEXT); CREATE TABLE orders(id INTEGER, customer_id INTEGER, amount INTEGER); INSERT INTO customers VALUES (1,'Ana'); INSERT INTO orders VALUES (1,1,100);\")",
+      "call": "[list(r) for r in big_spenders(conn)]",
+      "expected": [],
+      "kind": "value",
+      "rationale": "The contract says exceeds, so >= would be wrong."
+    },
+    {
+      "concept": "Object-Oriented Programming",
+      "name": "two baskets do not share contents",
+      "setup": "b1 = Basket()\nb2 = Basket()\nb1.add('apple')",
+      "call": "[list(b1.items), list(b2.items)]",
+      "expected": [
+        [
+          "apple"
+        ],
+        []
+      ],
+      "kind": "value",
+      "rationale": "Catches the misconception: a list defined at class level is created once and shared, so the apple appears in both baskets."
+    },
+    {
+      "concept": "Object-Oriented Programming",
+      "name": "one basket accumulates its own items",
+      "setup": "b = Basket()\nb.add('apple')\nb.add('pear')",
+      "call": "list(b.items)",
+      "expected": [
+        "apple",
+        "pear"
+      ],
+      "kind": "value",
+      "rationale": "Passes with the bug, which is why a single-instance test misses it."
+    },
+    {
+      "concept": "Object-Oriented Programming",
+      "name": "a fresh basket is empty",
+      "setup": "b1 = Basket()\nb1.add('apple')\nb2 = Basket()",
+      "call": "list(b2.items)",
+      "expected": [],
+      "kind": "value",
+      "rationale": "Constructing the second basket after the first has been used is the ordering that makes the shared state obvious."
+    }
+  ]
+}

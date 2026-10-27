@@ -125,6 +125,10 @@ _DEFAULTS = {
     "last_sources": [],
     "last_citations": [],
     "last_grounded": None,
+    "last_verification": {},
+    "last_judged_by": "",
+    "signature": "",
+    "contract": "",
 }
 for key, default in _DEFAULTS.items():
   if key not in st.session_state:
@@ -187,12 +191,16 @@ def generate_new_problem(concept_name: str) -> None:
   st.session_state.code_editor = flawed_code
   st.session_state.original_flawed_code = flawed_code
   st.session_state.expected_fix = data.get("expected_fix", "")
+  st.session_state.signature = data.get("signature", "")
+  st.session_state.contract = data.get("contract", "")
   st.session_state.selected_concept = concept_name
   st.session_state.attempt_count = 1
   st.session_state.sandbox_output = ""
   st.session_state.last_sources = []
   st.session_state.last_citations = []
   st.session_state.last_grounded = None
+  st.session_state.last_verification = {}
+  st.session_state.last_judged_by = ""
   st.session_state.session_id = uuid.uuid4().hex[:16]
 
   note = ""
@@ -293,6 +301,10 @@ with col_code:
   )
   st.session_state.code_editor = edited_code
 
+  if st.session_state.contract:
+    st.caption(
+        f"**{st.session_state.signature}** -- {st.session_state.contract}")
+
   if st.button("Reset code to original"):
     st.session_state.code_editor = st.session_state.original_flawed_code
     safe_rerun()
@@ -384,6 +396,8 @@ with col_chat:
         st.session_state.last_sources = data.get("sources", [])
         st.session_state.last_citations = data.get("valid_citations", [])
         st.session_state.last_grounded = data.get("grounded")
+        st.session_state.last_verification = data.get("verification", {})
+        st.session_state.last_judged_by = data.get("judged_by", "")
 
         if data.get("is_correct"):
           st.balloons()
@@ -395,6 +409,27 @@ with col_chat:
       st.error(f"Could not reach /evaluate: {exc}")
 
     safe_rerun()
+
+  # ------------------------------------------------------------------
+  # What running the code showed
+  # ------------------------------------------------------------------
+  checked = st.session_state.last_verification
+  if checked and checked.get("ran") and checked.get("total"):
+    passed, total = checked["passed"], checked["total"]
+    with st.expander(f"Test cases ({passed}/{total} passing)",
+                     expanded=passed < total):
+      if st.session_state.last_judged_by == "tests":
+        st.caption(
+            "The verdict above comes from running these, not from the "
+            "tutor's reading of your code."
+        )
+      for case in checked.get("cases", []):
+        mark = "pass" if case["passed"] else "FAIL"
+        st.markdown(f"`{mark}` &nbsp; {case['name']}")
+        if not case["passed"] and case.get("detail"):
+          st.caption(case["detail"])
+  elif checked and not checked.get("ran") and checked.get("error"):
+    st.caption(f"Test cases did not run: {checked['error']}")
 
   # ------------------------------------------------------------------
   # What the tutor actually read

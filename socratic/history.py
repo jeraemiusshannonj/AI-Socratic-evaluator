@@ -61,6 +61,11 @@ def log_interaction(
     grounded: bool | None = None,
     passage_count: int = 0,
     usage: dict[str, Any] | None = None,
+    judged_by: str = "model",
+    model_is_correct: bool | None = None,
+    model_agreed: bool | None = None,
+    tests_passed: int | None = None,
+    tests_total: int | None = None,
 ) -> str | None:
   """Record one evaluation turn. Returns the document id, or None on failure.
 
@@ -82,6 +87,15 @@ def log_interaction(
       "grounded": bool(grounded) if grounded is not None else None,
       "passage_count": passage_count,
       "usage": usage or {},
+      # Whether the verdict came from running the code or from the model,
+      # and whether the two agreed. Stored per turn so the agreement rate
+      # can be computed over real sessions rather than only over an eval
+      # set -- the eval set is fixed, and this is not.
+      "judged_by": judged_by,
+      "model_is_correct": model_is_correct,
+      "model_agreed": model_agreed,
+      "tests_passed": tests_passed,
+      "tests_total": tests_total,
   }
 
   try:

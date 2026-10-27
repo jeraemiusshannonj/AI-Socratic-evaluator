@@ -28,7 +28,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
-from . import config, retrieval, vertex
+from . import config, retrieval, verify, vertex
 from .retrieval import Passage
 
 log = logging.getLogger(__name__)
@@ -75,6 +75,11 @@ class Exercise:
   # it matched through the alias list. Worth surfacing: an alias match means
   # the bug injected is for a related variant, not this exact one.
   taxonomy_match: str
+  # The interface the generated code must expose. Shown to the student so
+  # they know what they are meant to be fixing, and relied on by the test
+  # cases, which call the function by name.
+  signature: str = ""
+  contract: str = ""
 
   def to_dict(self) -> dict[str, Any]:
     return {
@@ -82,6 +87,8 @@ class Exercise:
         "flawed_code": self.flawed_code,
         "expected_fix": self.expected_fix,
         "taxonomy_match": self.taxonomy_match,
+        "signature": self.signature,
+        "contract": self.contract,
     }
 
 
@@ -90,6 +97,13 @@ class Evaluation:
   is_correct: bool
   reasoning: str
   feedback: str
+  # What the model concluded on its own, kept separate from `is_correct`.
+  # When test cases exist they decide correctness and this records whether
+  # the model agreed -- a disagreement rate is a far more interesting
+  # number than either judgement alone.
+  model_is_correct: bool | None = None
+  judged_by: str = "model"
+  verification: dict[str, Any] = field(default_factory=dict)
   # Chunk ids the model said it used.
   citations: list[str] = field(default_factory=list)
   # Of those, the ones that were actually in the prompt.
@@ -105,9 +119,20 @@ class Evaluation:
     """Did the critic cite at least one passage it was actually given?"""
     return bool(self.valid_citations)
 
+  @property
+  def model_agreed(self) -> bool | None:
+    """Did the model's own verdict match what running the code showed?"""
+    if self.model_is_correct is None or self.judged_by != "tests":
+      return None
+    return self.model_is_correct == self.is_correct
+
   def to_dict(self) -> dict[str, Any]:
     return {
         "is_correct": self.is_correct,
+        "model_is_correct": self.model_is_correct,
+        "judged_by": self.judged_by,
+        "model_agreed": self.model_agreed,
+        "verification": self.verification,
         "reasoning": self.reasoning,
         "feedback": self.feedback,
         "citations": self.citations,
@@ -138,18 +163,23 @@ _GENERATOR_SYSTEM = (
 
 _GENERATOR_PROMPT = """\
 TOPIC: {concept}
+REQUIRED INTERFACE: {signature}
+WHAT IT MUST DO: {contract}
 BUG YOU MUST INJECT: {misconception}
 
 Rules:
-1. Output only a Python function definition starting with `def`.
-2. The function must contain the bug described above, introduced naturally
-   as a plausible mistake a student would make.
-3. No driver code, no test data, no prints outside the function.
-4. No comments, and nothing that hints at where the bug is.
-5. The code must be syntactically valid and must run -- it should produce
-   wrong answers or loop forever, not raise SyntaxError.
+1. Output only the definition, starting with `def` or `class`.
+2. Use exactly the interface given above -- the same name and the same
+   parameters. Anything else is wrong even if the code is good.
+3. Apart from the injected bug, follow the contract exactly.
+4. The bug must be introduced naturally, as a plausible mistake a student
+   would make, not as something obviously out of place.
+5. No driver code, no test data, no prints outside the definition.
+6. No comments, and nothing that hints at where the bug is.
+7. The code must be syntactically valid and must run. It should produce
+   wrong answers or fail to terminate, not raise SyntaxError.
 
-Generate the flawed function for {concept}."""
+Generate the flawed implementation for {concept}."""
 
 
 def generate_flaw(concept: str, *, usage: vertex.Usage | None = None) -> Exercise:
@@ -175,7 +205,13 @@ def generate_flaw(concept: str, *, usage: vertex.Usage | None = None) -> Exercis
         "for the related variant.", concept, matched)
 
   raw = vertex.generate(
-      _GENERATOR_PROMPT.format(concept=concept, misconception=misconception),
+      _GENERATOR_PROMPT.format(
+          concept=concept,
+          misconception=misconception,
+          signature=entry.get("signature") or "a single function",
+          contract=entry.get("contract") or "Behave correctly apart from "
+                                            "the injected bug.",
+      ),
       system_instruction=_GENERATOR_SYSTEM,
       temperature=0.3,
       usage=usage,
@@ -186,6 +222,8 @@ def generate_flaw(concept: str, *, usage: vertex.Usage | None = None) -> Exercis
       flawed_code=extract_code(raw),
       expected_fix=misconception,
       taxonomy_match=match_kind,
+      signature=entry.get("signature", ""),
+      contract=entry.get("contract", ""),
   )
 
 
@@ -234,6 +272,14 @@ _EVAL_PROMPT = """\
 ```python
 {code}
 ```
+
+### Test results
+{verification}
+
+The test results above come from actually running the student's code. They
+are fact. Where your reading of the code disagrees with them, the test
+results are right and your reading is wrong. Use the failing case names to
+say something specific about what breaks.
 
 ### Recent conversation
 {history}
@@ -344,6 +390,7 @@ def evaluate_student(
     expected_fix: str = "",
     usage: vertex.Usage | None = None,
     k: int = EVAL_PASSAGE_COUNT,
+    run_tests: bool = True,
 ) -> Evaluation:
   """Judge the student's code and explain it from retrieved sources.
 
@@ -370,11 +417,26 @@ def evaluate_student(
     log.warning("Retrieval failed, evaluating without passages: %s", exc)
     passages = []
 
+  # Run the code before asking the model about it. Whether a fix works is a
+  # question with an answer, and reading the code to guess at it is the one
+  # thing a language model is least dependable at.
+  if run_tests:
+    try:
+      checked = verify.verify(current_code, concept)
+    except Exception as exc:  # noqa: BLE001
+      log.warning("Verification failed for %r: %s", concept, exc)
+      checked = verify.VerificationResult(
+          concept=concept, ran=False, error=str(exc))
+  else:
+    checked = verify.VerificationResult(concept=concept, ran=False,
+                                        error="test execution disabled")
+
   prompt = _EVAL_PROMPT.format(
       concept=concept,
       expected_fix=expected_fix,
       passages=_format_passages(passages),
       code=current_code,
+      verification=checked.as_prompt_block(),
       history=_format_history(chat_history),
       scaffolding=_scaffolding_for(attempt_count),
   )
@@ -391,8 +453,22 @@ def evaluate_student(
   supplied = {p.chunk_id for p in passages}
   cited = _normalise_citations(data.get("citations"), data.get("feedback", ""))
 
+  model_verdict = bool(data.get("is_correct", False))
+  # Executable cases decide correctness where they exist; the model's view
+  # is kept for comparison rather than discarded. Where no cases exist for
+  # a concept, the model is all there is, and `judged_by` says so.
+  if checked.ran and checked.cases:
+    is_correct = checked.all_passed
+    judged_by = "tests"
+  else:
+    is_correct = model_verdict
+    judged_by = "model"
+
   return Evaluation(
-      is_correct=bool(data.get("is_correct", False)),
+      is_correct=is_correct,
+      model_is_correct=model_verdict,
+      judged_by=judged_by,
+      verification=checked.to_dict(),
       reasoning=str(data.get("reasoning", "")),
       feedback=str(data.get("feedback", "")),
       citations=cited,

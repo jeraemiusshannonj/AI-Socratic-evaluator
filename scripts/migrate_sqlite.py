@@ -116,6 +116,14 @@ def migrate_taxonomy() -> int:
                       "concept": concept,
                       "concept_family": concept_family(concept),
                       "misconception": row["Misconception"].strip(),
+                      # Signature and contract pin what the generated
+                      # function is called and what it must do. Without
+                      # them each generation invents its own interface --
+                      # one Linear Search returns a bool, the next an
+                      # index -- and no executable test case can assert
+                      # anything about either.
+                      "signature": (row.get("Signature") or "").strip(),
+                      "contract": (row.get("Contract") or "").strip(),
                   },
                   "$addToSet": {"aliases": concept_family(concept)},
               },

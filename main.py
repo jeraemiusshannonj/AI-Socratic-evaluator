@@ -210,6 +210,7 @@ def api_evaluate(req: EvalRequest) -> dict[str, Any]:
     log.exception("evaluate failed for %r", req.concept)
     raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+  verification = evaluation.verification or {}
   history.log_interaction(
       concept=req.concept,
       is_correct=evaluation.is_correct,
@@ -221,7 +222,21 @@ def api_evaluate(req: EvalRequest) -> dict[str, Any]:
       grounded=evaluation.grounded,
       passage_count=len(evaluation.passages),
       usage=usage.summary(),
+      judged_by=evaluation.judged_by,
+      model_is_correct=evaluation.model_is_correct,
+      model_agreed=evaluation.model_agreed,
+      tests_passed=verification.get("passed"),
+      tests_total=verification.get("total"),
   )
+
+  if evaluation.model_agreed is False:
+    # The model read the code one way and running it showed the other.
+    # Worth a log line: it is the raw material for the agreement rate, and
+    # a run of these means the critic is drifting from what the code does.
+    log.info(
+        "Model verdict (%s) disagreed with tests (%s) on %r: %s/%s cases",
+        evaluation.model_is_correct, evaluation.is_correct, req.concept,
+        verification.get("passed"), verification.get("total"))
 
   if evaluation.invalid_citations:
     # The critic named a passage that was never in its prompt. Worth a log
