@@ -13,8 +13,9 @@ chroma_db/
 *.sqlite
 *.sqlite3
 
-# Eval artifacts
-eval/results/
+# Eval artifacts. eval/results/ is deliberately NOT ignored: the README
+# quotes those numbers, and a reader who can open the raw report has a way
+# to check them. Large intermediate dumps still are.
 *.jsonl.gz
 
 # Corpus build. Upstream clones and the converted markdown are both
