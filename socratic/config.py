@@ -6,6 +6,12 @@ in one place and verify against your own project with:
     python -m scripts.check_models
 """
 
+# Required: this module is imported by everything, including on Python 3.9
+# where `float | None` in an annotation is evaluated at import time and
+# raises TypeError. Without it, adding a union here breaks every script in
+# the project at once, which is exactly what happened.
+from __future__ import annotations
+
 import os
 
 from dotenv import load_dotenv
