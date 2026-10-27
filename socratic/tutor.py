@@ -38,6 +38,9 @@ log = logging.getLogger(__name__)
 # citation that is technically valid and substantively irrelevant.
 EVAL_PASSAGE_COUNT = 3
 
+# Bounded at one; see check_grounding.
+MAX_REVISIONS = 1
+
 # Passages below this cosine score are dropped rather than padded in. If
 # nothing clears it, the critic is told explicitly that the corpus has
 # nothing for this question, which is better than it quietly reasoning
@@ -112,6 +115,10 @@ class Evaluation:
   # means the model invented a source, which is the thing worth catching.
   invalid_citations: list[str] = field(default_factory=list)
   passages: list[Passage] = field(default_factory=list)
+  # How many times the answer was sent back for failing the citation
+  # check, and why the last rejection happened.
+  revisions: int = 0
+  revision_reason: str = ""
   usage: dict[str, Any] = field(default_factory=dict)
 
   @property
@@ -139,6 +146,8 @@ class Evaluation:
         "valid_citations": self.valid_citations,
         "invalid_citations": self.invalid_citations,
         "grounded": self.grounded,
+        "revisions": self.revisions,
+        "revision_reason": self.revision_reason,
         "sources": [
             {
                 "chunk_id": p.chunk_id,
@@ -441,17 +450,38 @@ def evaluate_student(
       scaffolding=_scaffolding_for(attempt_count),
   )
 
-  raw = vertex.generate(
-      prompt,
-      system_instruction=_EVAL_SYSTEM,
-      temperature=0.0,
-      response_schema=_EVAL_SCHEMA,
-      usage=usage,
-  )
-
-  data = _parse_evaluation(raw)
   supplied = {p.chunk_id for p in passages}
-  cited = _normalise_citations(data.get("citations"), data.get("feedback", ""))
+  base_prompt = prompt
+  revisions = 0
+  revision_reason = ""
+
+  # One bounded revision when the citation check fails. Detecting a
+  # fabricated source and then using the answer anyway makes the check
+  # decorative; a model that fabricates twice will fabricate ten times, so
+  # the retry is capped at one.
+  while True:
+    raw = vertex.generate(
+        prompt,
+        system_instruction=_EVAL_SYSTEM,
+        temperature=0.0,
+        response_schema=_EVAL_SCHEMA,
+        usage=usage,
+    )
+    data = _parse_evaluation(raw)
+    cited = _normalise_citations(
+        data.get("citations"), data.get("feedback", ""))
+
+    problem = check_grounding(cited, supplied, bool(passages))
+    if not problem or revisions >= MAX_REVISIONS:
+      if problem:
+        log.warning("Evaluation still ungrounded after %d revision(s): %s",
+                    revisions, problem)
+      break
+
+    revisions += 1
+    revision_reason = problem
+    log.info("Revising evaluation (attempt %d): %s", revisions + 1, problem)
+    prompt = base_prompt + _REVISION_NOTE.format(problem=problem)
 
   model_verdict = bool(data.get("is_correct", False))
   # Executable cases decide correctness where they exist; the model's view
@@ -475,8 +505,45 @@ def evaluate_student(
       valid_citations=[c for c in cited if c in supplied],
       invalid_citations=[c for c in cited if c not in supplied],
       passages=list(passages),
+      revisions=revisions,
+      revision_reason=revision_reason,
       usage=usage.summary() if usage else {},
   )
+
+
+def check_grounding(
+    citations: list[str], supplied: set[str], had_passages: bool
+) -> str:
+  """Why this answer should be revised, or "" if it should not.
+
+  Two failures earn a retry. Citing an id that was never supplied is a
+  fabricated source. Citing nothing while passages were available means
+  the answer came from the model's own knowledge while the response still
+  carries a citations field -- which is the failure that field exists to
+  catch.
+  """
+  invalid = [c for c in citations if c not in supplied]
+  if invalid:
+    return (
+        f"You cited {invalid}, which were not among the passages you were "
+        f"given. Only these ids exist: {sorted(supplied)}."
+    )
+  if had_passages and not citations:
+    return (
+        "You cited nothing, although passages were supplied. Either cite "
+        "the ones you used, or say the material does not cover it."
+    )
+  return ""
+
+
+_REVISION_NOTE = """
+
+### Your previous answer was rejected
+{problem}
+
+The passages above are the only ones available. Answer again using them.
+If none support an answer, say so and return an empty citations list --
+that is a correct response, not a failure."""
 
 
 def _parse_evaluation(raw: str) -> dict[str, Any]:

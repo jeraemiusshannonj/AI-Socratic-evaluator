@@ -79,7 +79,8 @@ RATE_LIMIT_PER_IP = int(os.getenv("RATE_LIMIT_PER_IP", "30"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "3600"))
 RATE_LIMIT_DAILY_TOTAL = int(os.getenv("RATE_LIMIT_DAILY_TOTAL", "500"))
 # Endpoints that cost money. Cheap reads are not metered.
-METERED_PATHS = ("/api/generate", "/api/evaluate", "/api/search")
+METERED_PATHS = ("/api/generate", "/api/evaluate", "/api/search",
+                 "/api/ask")
 
 COLL_CHUNKS = "cs_chunks"          # unstructured: vector-searched
 COLL_MISCONCEPTIONS = "misconceptions"  # structured: taxonomy

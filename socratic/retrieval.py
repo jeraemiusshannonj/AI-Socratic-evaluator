@@ -262,7 +262,8 @@ def corpus_stats() -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Tool declarations -- consumed by the coordinator agent
+# Tool declarations -- consumed by socratic/coordinator.py, which asks the
+# model which of these a turn needs rather than calling them all.
 # ---------------------------------------------------------------------------
 TOOL_REGISTRY = {
     "semantic_search": semantic_search,

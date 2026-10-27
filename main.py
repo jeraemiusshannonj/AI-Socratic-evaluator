@@ -31,8 +31,8 @@ from pydantic import BaseModel, Field
 
 from fastapi.responses import JSONResponse
 
-from socratic import (config, db, history, ratelimit, retrieval,
-                      sandbox_client, tutor, vertex)
+from socratic import (config, coordinator, db, history, ratelimit,
+                      retrieval, sandbox_client, tutor, vertex)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -111,6 +111,13 @@ class EvalRequest(BaseModel):
   # all landing under one id as the legacy rows did.
   student_id: Optional[str] = None
   session_id: Optional[str] = None
+
+
+class AskRequest(BaseModel):
+  question: str
+  concept: Optional[str] = ""
+  student_id: Optional[str] = None
+  k: int = 3
 
 
 class SearchRequest(BaseModel):
@@ -298,6 +305,42 @@ def api_evaluate(req: EvalRequest) -> dict[str, Any]:
         len(evaluation.invalid_citations), evaluation.invalid_citations)
 
   return evaluation.to_dict()
+
+
+# ---------------------------------------------------------------------------
+# Free-form questions: routed, answered, revised once if ungrounded
+# ---------------------------------------------------------------------------
+@app.post("/api/ask")
+def api_ask(req: AskRequest) -> dict[str, Any]:
+  """Answer a question by choosing retrieval paths rather than fixing them.
+
+  Unlike /api/evaluate, which always does the same thing, this routes:
+  "why does this loop never end" reaches the corpus, "have I got this
+  wrong before" reaches the student's records, and "what should I practise"
+  is a ranking neither embedding nor corpus can produce. The response
+  carries the plan, so the routing decision is inspectable rather than
+  implied.
+  """
+  if not req.question.strip():
+    raise HTTPException(status_code=422, detail="No question supplied.")
+
+  usage = vertex.Usage()
+  try:
+    answer = coordinator.answer_question(
+        req.question,
+        concept=req.concept or "",
+        student_id=req.student_id or "anonymous",
+        k=req.k,
+        usage=usage,
+    )
+  except Exception as exc:  # noqa: BLE001
+    log.exception("ask failed")
+    raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+  if answer.revisions:
+    log.info("Answer required %d revision(s): %s",
+             answer.revisions, answer.revision_reason)
+  return answer.to_dict()
 
 
 # ---------------------------------------------------------------------------
