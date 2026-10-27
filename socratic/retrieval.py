@@ -247,7 +247,14 @@ def corpus_stats() -> dict[str, Any]:
       "misconceptions": db.misconceptions().count_documents({}),
       "interactions": db.interactions().count_documents({}),
       "test_cases": db.test_cases().count_documents({}),
-      "distinct_concepts": len(db.chunks().distinct("concept_tags")),
+      # distinct() on an array field emits a null for every document whose
+      # array is empty, and 156 chunks legitimately carry no concept tag.
+      # Counting the raw result reports one concept more than exists --
+      # which is how this was found, as a 23 against a taxonomy of 22.
+      "distinct_concepts": len(
+          [c for c in db.chunks().distinct("concept_tags") if c]
+      ),
+      "untagged_chunks": db.chunks().count_documents({"concept_tags": []}),
       "distinct_sources": len(db.chunks().distinct("source_id")),
       "licenses": sorted(db.chunks().distinct("license")),
       "interactions_since": cutoff.isoformat(),
