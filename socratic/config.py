@@ -96,6 +96,28 @@ MAX_FREE_TIER_SEARCH_INDEXES = 3
 # ---------------------------------------------------------------------------
 # Retrieval defaults
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Pricing, for the cost-per-request metric
+# ---------------------------------------------------------------------------
+# Left at zero on purpose. Model prices change and are not worth hardcoding
+# wrong: take the current figures for GEN_MODEL from Google's Vertex AI
+# pricing page and set these in .env. When they are zero the eval reports
+# token counts and says cost is unconfigured, rather than printing a
+# number nobody can defend.
+PRICE_PER_1M_INPUT_TOKENS = float(os.getenv("PRICE_PER_1M_INPUT_TOKENS", "0"))
+PRICE_PER_1M_OUTPUT_TOKENS = float(os.getenv("PRICE_PER_1M_OUTPUT_TOKENS", "0"))
+
+
+def cost_of(prompt_tokens: int, output_tokens: int) -> float | None:
+  """Dollar cost of a call, or None when prices are not configured."""
+  if not (PRICE_PER_1M_INPUT_TOKENS or PRICE_PER_1M_OUTPUT_TOKENS):
+    return None
+  return (
+      prompt_tokens / 1_000_000 * PRICE_PER_1M_INPUT_TOKENS
+      + output_tokens / 1_000_000 * PRICE_PER_1M_OUTPUT_TOKENS
+  )
+
+
 DEFAULT_K = 5
 # Atlas guidance: numCandidates should be 10-20x the limit for good recall.
 NUM_CANDIDATES_MULTIPLIER = 20

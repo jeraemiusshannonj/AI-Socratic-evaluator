@@ -1,0 +1,87 @@
+{
+  "_comment": [
+    "Questions the corpus genuinely cannot answer. The correct behaviour is",
+    "to say so, not to fill the gap from the model's own knowledge.",
+    "",
+    "Every one of these is a real computer science question that a student",
+    "could plausibly ask this tutor, and every one is outside what the 54",
+    "ingested documents cover. That combination is the point: a question",
+    "that is obviously off-topic ('what is the capital of France') tests",
+    "nothing, because refusing it requires no judgement. These are",
+    "on-topic and absent, which is the case where a model is most tempted",
+    "to answer from memory while the response still carries a citations",
+    "field.",
+    "",
+    "Each was checked against corpus/sources.py by hand. `why_absent` says",
+    "which chapter would have covered it and why it is not in the corpus --",
+    "usually because the OpenDSA chapter was never selected, since the",
+    "corpus is deliberately scoped to the 22 concepts in the taxonomy.",
+    "",
+    "A correct response: no fabricated citations, and the answer states",
+    "that the material does not cover it. Answering correctly from the",
+    "model's own knowledge still counts as a failure here -- the claim",
+    "being tested is groundedness, not whether Gemini knows what Raft is."
+  ],
+  "questions": [
+    {
+      "query": "how does the Raft consensus algorithm elect a leader",
+      "concept": "Recursion",
+      "why_absent": "Distributed systems. No OpenDSA chapter on consensus was ingested."
+    },
+    {
+      "query": "what happens during a red-black tree rebalance after an insertion",
+      "concept": "Heap Sort (0-Indexed Parent/Child)",
+      "why_absent": "OpenDSA has a balanced-tree chapter, but only Binary/Heaps, CompleteTree, BinaryTreeTraversal and RecursiveDS were selected."
+    },
+    {
+      "query": "how does a B-tree decide when to split a node",
+      "concept": "Hash Tables",
+      "why_absent": "OpenDSA's Indexing chapter was not ingested; the corpus covers hashing, not external indexing."
+    },
+    {
+      "query": "what is the time complexity of Dijkstra's shortest path algorithm",
+      "concept": "Graph Traversal (BFS Visited Tracking)",
+      "why_absent": "Graph/GraphShortest.rst exists upstream but is not among the four Graph documents selected, which cover traversal and topological sort."
+    },
+    {
+      "query": "how does memoization turn an exponential recursion into a polynomial one",
+      "concept": "Recursion",
+      "why_absent": "Dynamic programming was not ingested. The recursion documents cover base cases, tracing and the call stack."
+    },
+    {
+      "query": "what does the Rust borrow checker prevent that a garbage collector does not",
+      "concept": "Python Object Mutability",
+      "why_absent": "The corpus covers Python semantics only. No Rust material anywhere."
+    },
+    {
+      "query": "how does TCP congestion control decide when to shrink the window",
+      "concept": "Linear Search",
+      "why_absent": "Networking. Nothing in the corpus touches it."
+    },
+    {
+      "query": "what tradeoff does the CAP theorem describe for a distributed database",
+      "concept": "SQL Left Join",
+      "why_absent": "The SQL documents are SQLAlchemy's query tutorials; they cover joins and grouping, not distributed systems theory."
+    },
+    {
+      "query": "how do you build a database index on a column to speed up a query",
+      "concept": "SQL Group By",
+      "why_absent": "Near-miss by design: the corpus covers SELECT, JOIN and GROUP BY, but nothing on index structures or query planning."
+    },
+    {
+      "query": "how does Python's garbage collector detect reference cycles",
+      "concept": "Python Object Mutability",
+      "why_absent": "Near-miss: the corpus covers mutability, aliasing and copying, but the FAQ sections on cyclic garbage collection were not ingested."
+    },
+    {
+      "query": "what is the difference between a stable and an unstable sort",
+      "concept": "Merge Sort (Slice Overhead)",
+      "why_absent": "Near-miss: six sorting documents are ingested and none of them discuss stability."
+    },
+    {
+      "query": "how does a bloom filter trade accuracy for space",
+      "concept": "Hash Tables",
+      "why_absent": "Near-miss: nine hashing documents are ingested, covering collision resolution and load factor, none covering probabilistic structures."
+    }
+  ]
+}

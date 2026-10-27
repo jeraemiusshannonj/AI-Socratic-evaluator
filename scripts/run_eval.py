@@ -43,9 +43,17 @@ from pathlib import Path
 from typing import Any
 
 from eval import references
-from socratic import config, retrieval, tutor, vertex
+from socratic import config, coordinator, retrieval, tutor, vertex
 
-QUESTIONS_PATH = Path(__file__).resolve().parent.parent / "eval" / "retrieval_questions.json"
+EVAL_DIR = Path(__file__).resolve().parent.parent / "eval"
+QUESTIONS_PATH = EVAL_DIR / "retrieval_questions.json"
+UNANSWERABLE_PATH = EVAL_DIR / "unanswerable_questions.json"
+ROUTING_PATH = EVAL_DIR / "routing_questions.json"
+
+
+def _min_score() -> float:
+  from socratic import tutor as _t
+  return _t.MIN_PASSAGE_SCORE
 
 
 def _pct(numerator: int, denominator: int) -> str:
@@ -197,10 +205,169 @@ def run_critic(
   return outcome
 
 
+# ---------------------------------------------------------------------------
+# Does it refuse what the corpus cannot answer?
+# ---------------------------------------------------------------------------
+_JUDGE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "refused": {"type": "BOOLEAN"},
+        "why": {"type": "STRING"},
+    },
+    "required": ["refused", "why"],
+}
+
+_JUDGE_PROMPT = """\
+A tutoring system was asked a question its reference material does not
+cover. Here is what it said.
+
+Question: {question}
+
+Response: {answer}
+
+Did the response decline, on the grounds that the available material does
+not cover the question? Answer true only if it actually said the material
+is insufficient. A response that answers the question correctly from
+general knowledge, without saying the material does not cover it, is NOT
+a refusal -- set refused to false."""
+
+
+@dataclass
+class RefusalOutcome:
+  total: int = 0
+  refused: int = 0
+  fabricated: int = 0
+  answered_anyway: list[dict] = field(default_factory=list)
+  top_scores: list[float] = field(default_factory=list)
+
+  def summary(self) -> dict[str, Any]:
+    return {
+        "questions": self.total,
+        "refused": self.refused,
+        "correct_refusal_rate": round(self.refused / self.total, 3)
+                                if self.total else 0,
+        "fabricated_citations": self.fabricated,
+        "top_score_median": round(statistics.median(self.top_scores), 4)
+                            if self.top_scores else None,
+        "top_score_max": round(max(self.top_scores), 4)
+                         if self.top_scores else None,
+        "answered_anyway": self.answered_anyway,
+    }
+
+
+def run_refusal(k: int, usage: vertex.Usage) -> RefusalOutcome:
+  questions = json.loads(
+      UNANSWERABLE_PATH.read_text(encoding="utf-8"))["questions"]
+  outcome = RefusalOutcome(total=len(questions))
+
+  for item in questions:
+    print(f"  {item['query'][:66]}", flush=True)
+    try:
+      answer = coordinator.answer_question(
+          item["query"], concept=item.get("concept", ""), k=k, usage=usage)
+    except Exception as exc:  # noqa: BLE001
+      print(f"    failed: {exc}")
+      outcome.total -= 1
+      continue
+
+    if answer.passages:
+      outcome.top_scores.append(max(p.score for p in answer.passages))
+    if answer.invalid_citations:
+      outcome.fabricated += len(answer.invalid_citations)
+
+    verdict = vertex.generate(
+        _JUDGE_PROMPT.format(question=item["query"], answer=answer.text),
+        temperature=0.0, response_schema=_JUDGE_SCHEMA, usage=usage)
+    try:
+      refused = bool(json.loads(verdict).get("refused"))
+    except Exception:  # noqa: BLE001
+      refused = False
+
+    if refused:
+      outcome.refused += 1
+    else:
+      outcome.answered_anyway.append({
+          "query": item["query"],
+          "why_absent": item.get("why_absent", ""),
+          "answer": answer.text[:220],
+          "cited": answer.valid_citations,
+      })
+
+  return outcome
+
+
+# ---------------------------------------------------------------------------
+# Does the coordinator route to the right path?
+# ---------------------------------------------------------------------------
+@dataclass
+class RoutingOutcome:
+  total: int = 0
+  path_correct: int = 0
+  tool_correct: int = 0
+  tool_checked: int = 0
+  mistakes: list[dict] = field(default_factory=list)
+
+  def summary(self) -> dict[str, Any]:
+    return {
+        "questions": self.total,
+        "path_correct": self.path_correct,
+        "path_accuracy": round(self.path_correct / self.total, 3)
+                         if self.total else 0,
+        "tool_correct": self.tool_correct,
+        "tool_accuracy": round(self.tool_correct / self.tool_checked, 3)
+                         if self.tool_checked else None,
+        "mistakes": self.mistakes,
+    }
+
+
+def run_routing(usage: vertex.Usage) -> RoutingOutcome:
+  questions = json.loads(ROUTING_PATH.read_text(encoding="utf-8"))["questions"]
+  outcome = RoutingOutcome(total=len(questions))
+
+  for item in questions:
+    plan = coordinator.plan_turn(
+        item["query"], concept=item.get("concept", ""), usage=usage)
+    chosen = [c.name for c in plan.calls]
+    paths = set(plan.paths)
+    want = item["expect_path"]
+
+    if want == "both":
+      path_ok = {"structured", "unstructured"} <= paths
+    else:
+      path_ok = paths == {want}
+
+    outcome.path_correct += path_ok
+
+    tool_ok = None
+    if item.get("expect_tool"):
+      outcome.tool_checked += 1
+      tool_ok = item["expect_tool"] in chosen
+      outcome.tool_correct += tool_ok
+
+    print(f"  {'ok  ' if path_ok else 'MISS'} {item['query'][:56]}")
+    print(f"       wanted {want}, chose {sorted(paths) or ['nothing']} "
+          f"via {chosen}")
+
+    if not path_ok or tool_ok is False:
+      outcome.mistakes.append({
+          "query": item["query"],
+          "expected_path": want,
+          "expected_tool": item.get("expect_tool"),
+          "chose": chosen,
+          "reasoning": plan.reasoning,
+      })
+
+  return outcome
+
+
 def main() -> int:
   parser = argparse.ArgumentParser(description=__doc__)
   parser.add_argument("--retrieval", action="store_true")
   parser.add_argument("--critic", action="store_true")
+  parser.add_argument("--routing", action="store_true",
+                      help="does the coordinator pick the right path")
+  parser.add_argument("--refusal", action="store_true",
+                      help="does it decline what the corpus cannot answer")
   parser.add_argument("--all", action="store_true")
   parser.add_argument("-k", type=int, default=config.DEFAULT_K)
   parser.add_argument("--limit", type=int, default=0,
@@ -208,7 +375,8 @@ def main() -> int:
   parser.add_argument("--out", help="write the full report as JSON")
   args = parser.parse_args()
 
-  if not (args.retrieval or args.critic or args.all):
+  if not (args.retrieval or args.critic or args.routing
+          or args.refusal or args.all):
     parser.print_help()
     return 1
 
@@ -297,6 +465,69 @@ def main() -> int:
     print(f"  {usage.summary()['tokens_per_sec']} tokens/sec, "
           f"p50 {usage.summary()['p50_latency_ms']:.0f} ms, "
           f"p95 {usage.summary()['p95_latency_ms']:.0f} ms")
+
+  if args.routing or args.all:
+    print("\nRouting")
+    usage = vertex.Usage()
+    routing = run_routing(usage)
+    report["routing"] = routing.summary()
+    report.setdefault("usage_by_stage", {})["routing"] = usage.summary()
+    print(f"\n  path correct  {_pct(routing.path_correct, routing.total)}")
+    if routing.tool_checked:
+      print(f"  tool correct  "
+            f"{_pct(routing.tool_correct, routing.tool_checked)}")
+
+  if args.refusal or args.all:
+    print("\nRefusal on questions the corpus cannot answer")
+    usage = vertex.Usage()
+    refusal = run_refusal(args.k, usage)
+    report["refusal"] = refusal.summary()
+    report.setdefault("usage_by_stage", {})["refusal"] = usage.summary()
+
+    print(f"\n  correct refusal  "
+          f"{_pct(refusal.refused, refusal.total)}")
+    print(f"  fabricated citations  {refusal.fabricated}")
+    if refusal.top_scores:
+      print(f"  top passage score on unanswerable questions: "
+            f"median {statistics.median(refusal.top_scores):.4f}, "
+            f"max {max(refusal.top_scores):.4f}")
+      print(f"  (compare with MIN_PASSAGE_SCORE = {_min_score()}; a "
+            f"threshold between these and the answerable scores is what "
+            f"would let retrieval itself reject an off-corpus question)")
+    for row in refusal.answered_anyway:
+      print(f"\n  ANSWERED ANYWAY: {row['query'][:66]}")
+      print(f"    absent because: {row['why_absent'][:90]}")
+      print(f"    said: {row['answer'][:110]}")
+
+  # Cost per request, if prices are configured.
+  totals = report.get("usage") or {}
+  stage_usage = report.get("usage_by_stage", {})
+  calls = totals.get("calls", 0) + sum(
+      u.get("calls", 0) for u in stage_usage.values())
+  prompt_tokens = totals.get("prompt_tokens", 0) + sum(
+      u.get("prompt_tokens", 0) for u in stage_usage.values())
+  output_tokens = totals.get("output_tokens", 0) + sum(
+      u.get("output_tokens", 0) for u in stage_usage.values())
+
+  if calls:
+    cost = config.cost_of(prompt_tokens, output_tokens)
+    report["cost"] = {
+        "calls": calls,
+        "prompt_tokens": prompt_tokens,
+        "output_tokens": output_tokens,
+        "total_cost_usd": round(cost, 6) if cost is not None else None,
+        "cost_per_call_usd": round(cost / calls, 6)
+                             if cost is not None else None,
+        "pricing_configured": cost is not None,
+    }
+    print(f"\nCost")
+    print(f"  {calls} calls, {prompt_tokens:,} in / {output_tokens:,} out")
+    if cost is None:
+      print("  cost per request: not configured. Put the current prices for")
+      print(f"  {config.GEN_MODEL} in .env as PRICE_PER_1M_INPUT_TOKENS and")
+      print("  PRICE_PER_1M_OUTPUT_TOKENS, then re-run.")
+    else:
+      print(f"  ${cost:.4f} total, ${cost / calls:.6f} per request")
 
   if args.out:
     path = Path(args.out)

@@ -23,142 +23,265 @@
     {
       "query": "why does setting high = mid cause binary search to loop forever",
       "concept": "Binary Search (Off-by-One)",
-      "expect": ["opendsa:Searching_BinarySearch", "opendsa:Searching_SortedSearch"]
+      "expect": [
+        "opendsa:Searching_BinarySearch",
+        "opendsa:Searching_SortedSearch"
+      ],
+      "category": "factual"
     },
     {
       "query": "what is the invariant on low and high in binary search",
       "concept": "Binary Search (Loop Condition)",
-      "expect": ["opendsa:Searching_SortedSearch", "opendsa:Searching_BinarySearch"]
+      "expect": [
+        "opendsa:Searching_SortedSearch",
+        "opendsa:Searching_BinarySearch"
+      ],
+      "category": "factual"
     },
     {
       "query": "must an array be sorted before binary search works",
       "concept": "Binary Search (Prerequisite)",
-      "expect": ["opendsa:Searching_SearchIntro", "opendsa:Searching_BinarySearch", "opendsa:Searching_SortedSearch"]
+      "expect": [
+        "opendsa:Searching_SearchIntro",
+        "opendsa:Searching_BinarySearch",
+        "opendsa:Searching_SortedSearch"
+      ],
+      "category": "factual"
     },
     {
       "query": "how many elements does sequential search examine in the worst case",
       "concept": "Linear Search",
-      "expect": ["opendsa:Searching_UnsortedSearch", "opendsa:Searching_BinarySearch", "opendsa:Searching_SearchIntro"]
+      "expect": [
+        "opendsa:Searching_UnsortedSearch",
+        "opendsa:Searching_BinarySearch",
+        "opendsa:Searching_SearchIntro"
+      ],
+      "category": "factual"
     },
     {
       "query": "why does bubble sort need a flag to stop early on sorted input",
       "concept": "Bubble Sort (Early Exit)",
-      "expect": ["opendsa:Sorting_BubbleSort", "opendsa:Sorting_SortOpt", "opendsa:Sorting_ExchangeSort"]
+      "expect": [
+        "opendsa:Sorting_BubbleSort",
+        "opendsa:Sorting_SortOpt",
+        "opendsa:Sorting_ExchangeSort"
+      ],
+      "category": "factual"
     },
     {
       "query": "how many swaps does selection sort perform compared to bubble sort",
       "concept": "Selection Sort (Min Index Swap)",
-      "expect": ["opendsa:Sorting_SelectionSort", "opendsa:Sorting_ExchangeSort", "opendsa:Sorting_SortingEmpirical", "opendsa:Sorting_SortOpt"]
+      "expect": [
+        "opendsa:Sorting_SelectionSort",
+        "opendsa:Sorting_ExchangeSort",
+        "opendsa:Sorting_SortingEmpirical",
+        "opendsa:Sorting_SortOpt"
+      ],
+      "category": "comparative"
     },
     {
       "query": "how does insertion sort shift elements to make room for the key",
       "concept": "Insertion Sort (Shifting Bug)",
-      "expect": ["opendsa:Sorting_InsertionSort", "opendsa:Sorting_InSort", "opendsa:Sorting_Shellsort"]
+      "expect": [
+        "opendsa:Sorting_InsertionSort",
+        "opendsa:Sorting_InSort",
+        "opendsa:Sorting_Shellsort"
+      ],
+      "category": "factual"
     },
     {
       "query": "why is the merge step of mergesort expensive in memory",
       "concept": "Merge Sort (Slice Overhead)",
-      "expect": ["opendsa:Sorting_Mergesort", "opendsa:Sorting_MergesortImpl"]
+      "expect": [
+        "opendsa:Sorting_Mergesort",
+        "opendsa:Sorting_MergesortImpl"
+      ],
+      "category": "factual"
     },
     {
       "query": "how do the two pointers advance when merging two sorted sublists",
       "concept": "Merge Sort (Two-Pointer Comparison)",
-      "expect": ["opendsa:Sorting_Mergesort", "opendsa:Sorting_MergesortImpl"]
+      "expect": [
+        "opendsa:Sorting_Mergesort",
+        "opendsa:Sorting_MergesortImpl"
+      ],
+      "category": "factual"
     },
     {
       "query": "what does the partition step of quicksort return and why",
       "concept": "Quick Sort (Partition Off-By-One)",
-      "expect": ["opendsa:Sorting_Quicksort"]
+      "expect": [
+        "opendsa:Sorting_Quicksort"
+      ],
+      "category": "factual"
     },
     {
       "query": "where does the pivot end up after partitioning",
       "concept": "Quick Sort (Lomuto Partition)",
-      "expect": ["opendsa:Sorting_Quicksort"]
+      "expect": [
+        "opendsa:Sorting_Quicksort"
+      ],
+      "category": "factual"
     },
     {
       "query": "how do you find the children of a node in a heap stored in an array",
       "concept": "Heap Sort (0-Indexed Parent/Child)",
-      "expect": ["opendsa:Binary_Heaps", "opendsa:Binary_CompleteTree", "opendsa:Sorting_Heapsort"]
+      "expect": [
+        "opendsa:Binary_Heaps",
+        "opendsa:Binary_CompleteTree",
+        "opendsa:Sorting_Heapsort"
+      ],
+      "category": "factual"
     },
     {
       "query": "why mark a vertex visited before adding it to the queue in breadth first search",
       "concept": "Graph Traversal (BFS Visited Tracking)",
-      "expect": ["opendsa:Graph_GraphTraversal", "opendsa:Graph_GraphIntro"]
+      "expect": [
+        "opendsa:Graph_GraphTraversal",
+        "opendsa:Graph_GraphIntro"
+      ],
+      "category": "factual"
     },
     {
       "query": "how does depth first search detect a cycle in a directed graph",
       "concept": "Graph Traversal (DFS Cycle Detection)",
-      "expect": ["opendsa:Graph_GraphTraversal", "opendsa:Graph_GraphTopsort", "opendsa:Graph_GraphIntro"]
+      "expect": [
+        "opendsa:Graph_GraphTraversal",
+        "opendsa:Graph_GraphTopsort",
+        "opendsa:Graph_GraphIntro"
+      ],
+      "category": "factual"
     },
     {
       "query": "what is a base case and why must recursion have one",
       "concept": "Recursion",
-      "expect": ["opendsa:RecurTutor_RecIntro", "opendsa:RecurTutor_Write", "opendsa:Binary_RecursiveDS", "opendsa:RecurTutor_Trace"]
+      "expect": [
+        "opendsa:RecurTutor_RecIntro",
+        "opendsa:RecurTutor_Write",
+        "opendsa:Binary_RecursiveDS",
+        "opendsa:RecurTutor_Trace"
+      ],
+      "category": "factual"
     },
     {
       "query": "what does the call stack look like during a recursive call",
       "concept": "Recursion",
-      "expect": ["opendsa:List_StackRecur", "opendsa:RecurTutor_Trace"]
+      "expect": [
+        "opendsa:List_StackRecur",
+        "opendsa:RecurTutor_Trace"
+      ],
+      "category": "factual"
     },
     {
       "query": "what happens when two keys hash to the same bucket",
       "concept": "Hash Tables",
-      "expect": ["opendsa:Hashing_OpenHash", "opendsa:Hashing_BucketHash", "opendsa:Hashing_HashIntro", "opendsa:Hashing_HashCSimple"]
+      "expect": [
+        "opendsa:Hashing_OpenHash",
+        "opendsa:Hashing_BucketHash",
+        "opendsa:Hashing_HashIntro",
+        "opendsa:Hashing_HashCSimple"
+      ],
+      "category": "factual"
     },
     {
       "query": "how does the load factor affect hash table performance",
       "concept": "Hash Tables",
-      "expect": ["opendsa:Hashing_HashAnal", "opendsa:Hashing_OpenHash"]
+      "expect": [
+        "opendsa:Hashing_HashAnal",
+        "opendsa:Hashing_OpenHash"
+      ],
+      "category": "factual"
     },
     {
       "query": "what makes a good hash function spread keys evenly",
       "concept": "Hash Tables",
-      "expect": ["opendsa:Hashing_HashFunc", "opendsa:Hashing_HashFuncExamp"]
+      "expect": [
+        "opendsa:Hashing_HashFunc",
+        "opendsa:Hashing_HashFuncExamp"
+      ],
+      "category": "factual"
     },
     {
       "query": "what does a left outer join return when the right table has no matching row",
       "concept": "SQL Left Join",
-      "expect": ["sqlalchemy:tutorial_data_select", "sqlalchemy:orm_queryguide_relationships"]
+      "expect": [
+        "sqlalchemy:tutorial_data_select",
+        "sqlalchemy:orm_queryguide_relationships"
+      ],
+      "category": "factual"
     },
     {
       "query": "how do aggregate functions work with group by and having",
       "concept": "SQL Group By",
-      "expect": ["sqlalchemy:tutorial_data_select"]
+      "expect": [
+        "sqlalchemy:tutorial_data_select"
+      ],
+      "category": "factual"
     },
     {
       "query": "why does a mutable default argument keep its value between calls",
       "concept": "Python Default Arguments",
-      "expect": ["cpython:tutorial_controlflow", "cpython:faq_programming"]
+      "expect": [
+        "cpython:tutorial_controlflow",
+        "cpython:faq_programming"
+      ],
+      "category": "factual"
     },
     {
       "query": "is a tuple mutable and what does that mean for the objects inside it",
       "concept": "Python Object Mutability",
-      "expect": ["cpython:tutorial_datastructures", "cpython:faq_programming", "cpython:faq_design"]
+      "expect": [
+        "cpython:tutorial_datastructures",
+        "cpython:faq_programming",
+        "cpython:faq_design"
+      ],
+      "category": "factual"
     },
     {
       "query": "does assigning a list to another variable copy it",
       "concept": "Python Object Mutability",
-      "expect": ["cpython:faq_programming", "cpython:tutorial_datastructures"]
+      "expect": [
+        "cpython:faq_programming",
+        "cpython:tutorial_datastructures"
+      ],
+      "category": "factual"
     },
     {
       "query": "what happens if I remove items from a list while looping over it",
       "concept": "Python Lists",
-      "expect": ["cpython:faq_programming", "cpython:tutorial_datastructures"]
+      "expect": [
+        "cpython:faq_programming",
+        "cpython:tutorial_datastructures"
+      ],
+      "category": "factual"
     },
     {
       "query": "how are instance attributes different from class attributes",
       "concept": "Object-Oriented Programming",
-      "expect": ["cpython:tutorial_classes"]
+      "expect": [
+        "cpython:tutorial_classes"
+      ],
+      "category": "comparative"
     },
     {
       "query": "what is an abstract data type and how does it differ from its implementation",
       "concept": "Object-Oriented Programming",
-      "expect": ["opendsa:Design_ADT", "opendsa:Design_IntroOO", "opendsa:List_ListADT"]
+      "expect": [
+        "opendsa:Design_ADT",
+        "opendsa:Design_IntroOO",
+        "opendsa:List_ListADT"
+      ],
+      "category": "comparative"
     },
     {
       "query": "how is a list stored as an array behind the scenes",
       "concept": "Python Lists",
-      "expect": ["opendsa:List_ListArray", "opendsa:List_ListADT", "opendsa:List_ListIntro"]
+      "expect": [
+        "opendsa:List_ListArray",
+        "opendsa:List_ListADT",
+        "opendsa:List_ListIntro"
+      ],
+      "category": "factual"
     }
   ]
 }

@@ -1,0 +1,95 @@
+{
+  "_comment": [
+    "Does the coordinator send a turn to the right retrieval path?",
+    "",
+    "This is the measurement that says whether routing is doing anything.",
+    "A router that always picks semantic_search would score well on the",
+    "corpus questions and fail every one of these, and the corpus questions",
+    "alone would never reveal it.",
+    "",
+    "`expect_path` is what matters: unstructured for anything whose answer",
+    "is prose to be understood, structured for anything that is a fact",
+    "about this student or this exercise. `expect_tool`, where given, is",
+    "the stricter check -- several structured tools exist and picking the",
+    "wrong one still fails the student even though the path was right.",
+    "",
+    "The `both` cases are deliberate. 'Why do I keep getting this wrong'",
+    "needs the student's record to know what they keep doing and the corpus",
+    "to explain why it is wrong, and a router that picks one is giving half",
+    "an answer."
+  ],
+  "questions": [
+    {
+      "query": "why does setting high = mid make the loop run forever",
+      "concept": "Binary Search (Off-by-One)",
+      "expect_path": "unstructured",
+      "expect_tool": "semantic_search"
+    },
+    {
+      "query": "what does a left outer join return when nothing matches",
+      "concept": "SQL Left Join",
+      "expect_path": "unstructured",
+      "expect_tool": "semantic_search"
+    },
+    {
+      "query": "explain why a mutable default argument keeps its value",
+      "concept": "Python Default Arguments",
+      "expect_path": "unstructured",
+      "expect_tool": "semantic_search"
+    },
+    {
+      "query": "how do I find a node's children in an array-backed heap",
+      "concept": "Heap Sort (0-Indexed Parent/Child)",
+      "expect_path": "unstructured",
+      "expect_tool": "semantic_search"
+    },
+    {
+      "query": "have I attempted this concept before",
+      "concept": "Binary Search (Off-by-One)",
+      "expect_path": "structured",
+      "expect_tool": "student_concept_history"
+    },
+    {
+      "query": "how many times have I tried binary search and how did it go",
+      "concept": "Binary Search (Off-by-One)",
+      "expect_path": "structured",
+      "expect_tool": "student_concept_history"
+    },
+    {
+      "query": "what should I practise next",
+      "concept": "",
+      "expect_path": "structured",
+      "expect_tool": "weakest_concepts"
+    },
+    {
+      "query": "which concepts do I fail most often",
+      "concept": "",
+      "expect_path": "structured",
+      "expect_tool": "weakest_concepts"
+    },
+    {
+      "query": "what bug is hidden in this exercise",
+      "concept": "Linear Search",
+      "expect_path": "structured",
+      "expect_tool": "lookup_misconception"
+    },
+    {
+      "query": "what will my code be tested against",
+      "concept": "Insertion Sort (Shifting Bug)",
+      "expect_path": "structured",
+      "expect_tool": "lookup_test_cases"
+    },
+    {
+      "query": "why do I keep getting binary search wrong",
+      "concept": "Binary Search (Off-by-One)",
+      "expect_path": "both",
+      "note": "Needs the student's record to know what they keep doing and the corpus to explain why it is wrong."
+    },
+    {
+      "query": "am I improving at sorting, and what am I still missing",
+      "concept": "Bubble Sort (Early Exit)",
+      "expect_path": "both",
+      "note": "History for the trend, corpus for the gap."
+    }
+  ]
+}
