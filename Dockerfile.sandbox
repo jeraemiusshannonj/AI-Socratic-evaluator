@@ -1,0 +1,35 @@
+# The code execution service.
+#
+# Built to contain as little as possible. It gets two Python files and
+# FastAPI; no database driver, no cloud SDK, no dotenv, no application
+# code beyond the executor itself. A compromise here finds no credentials
+# because none are installed and none are mounted.
+#
+# socratic/execute.py is stdlib-only, which is what makes this possible --
+# see the note at the top of socratic/sandbox_client.py for why the HTTP
+# client lives elsewhere.
+
+FROM python:3.12-slim
+
+# Run as a non-root user. Student code executes with this uid, so root
+# here would mean root inside the container for arbitrary input.
+RUN useradd --create-home --uid 10001 runner
+
+WORKDIR /app
+
+COPY sandbox/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Only what the executor needs.
+COPY socratic/__init__.py socratic/execute.py ./socratic/
+COPY sandbox/__init__.py sandbox/main.py ./sandbox/
+
+USER runner
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8080
+
+# One worker. Concurrency is capped on the Cloud Run service instead, so
+# a single container cannot be asked to run many hostile programs at once.
+CMD exec uvicorn sandbox.main:app --host 0.0.0.0 --port ${PORT} --workers 1

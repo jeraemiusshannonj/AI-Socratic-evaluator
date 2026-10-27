@@ -29,7 +29,10 @@ from typing import Any, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from socratic import config, db, execute, history, retrieval, tutor, vertex
+from fastapi.responses import JSONResponse
+
+from socratic import (config, db, history, ratelimit, retrieval,
+                      sandbox_client, tutor, vertex)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,6 +49,42 @@ app = FastAPI(
     ),
     version="2.0.0",
 )
+
+
+@app.on_event("startup")
+def _refuse_unsafe_execution() -> None:
+  """Do not serve publicly while running untrusted code in this process.
+
+  The local execution path is correct on a laptop and wrong on a public
+  URL, and nothing at the call site distinguishes them. Cloud Run sets
+  K_SERVICE, so a deployed instance with no SANDBOX_URL fails to boot
+  rather than quietly running student code beside the Mongo credentials.
+  """
+  if config.IS_DEPLOYED and not config.ALLOW_LOCAL_EXECUTION:
+    sandbox_client.require_remote()
+  if config.SANDBOX_URL:
+    log.info("Untrusted code runs on the sandbox service at %s",
+             config.SANDBOX_URL)
+  else:
+    log.warning("No SANDBOX_URL: student code runs in THIS process. "
+                "Local development only.")
+
+
+@app.middleware("http")
+async def _rate_limit(request, call_next):
+  """Cap the endpoints that cost money. See socratic/ratelimit.py."""
+  decision = ratelimit.check(request.url.path,
+                             ratelimit.client_ip(dict(request.headers)))
+  if not decision.allowed:
+    return JSONResponse(
+        status_code=429,
+        content={"detail": decision.reason},
+        headers=decision.headers(),
+    )
+  response = await call_next(request)
+  for name, value in decision.headers().items():
+    response.headers[name] = value
+  return response
 
 
 # ---------------------------------------------------------------------------
@@ -122,6 +161,18 @@ def api_health() -> dict[str, Any]:
   except Exception as exc:  # noqa: BLE001
     status["search_indexes"] = {"error": str(exc)}
 
+  status["execution"] = {
+      "mode": "sandbox-service" if config.SANDBOX_URL else "in-process",
+      "sandbox_url": config.SANDBOX_URL or None,
+      "deployed": config.IS_DEPLOYED,
+  }
+  if config.IS_DEPLOYED and not config.SANDBOX_URL:
+    status["ok"] = False
+    status["execution"]["warning"] = (
+        "untrusted code is running inside the API process")
+
+  status["rate_limit"] = ratelimit.usage_today()
+
   status["models"] = {
       "generation": config.GEN_MODEL,
       "embedding": f"{config.EMBED_MODEL}@{config.EMBED_DIM}",
@@ -182,7 +233,7 @@ def api_generate(req: ConceptRequest) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 @app.post("/api/run")
 def api_run(req: RunRequest) -> dict[str, Any]:
-  result = execute.run_student_code(req.flawed_code, req.test_script)
+  result = sandbox_client.run(req.flawed_code, req.test_script)
   return result.to_dict()
 
 

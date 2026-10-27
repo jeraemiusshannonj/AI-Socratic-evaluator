@@ -15,6 +15,7 @@ Changed alongside the backend rewiring, in three ways that matter:
     The old schema had no identifier at all.
 """
 
+import os
 import uuid
 
 import requests
@@ -27,7 +28,14 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-API_BASE_URL = "http://localhost:8000/api"
+# Local development by default; set API_BASE_URL to the deployed API
+# service when running on Cloud Run. The trailing /api is added here so the
+# environment variable is just the service URL as gcloud prints it.
+# `or` rather than a get() default: Cloud Run sets an unset variable to the
+# empty string rather than omitting it, and "".rstrip("/") + "/api" is a
+# relative path that fails with a confusing error much later.
+_API_ROOT = (os.environ.get("API_BASE_URL") or "http://localhost:8000").rstrip("/")
+API_BASE_URL = _API_ROOT if _API_ROOT.endswith("/api") else f"{_API_ROOT}/api"
 
 # Generation and evaluation both make a model call; evaluation also makes an
 # embedding call and a vector search first. The old 15/20s timeouts were

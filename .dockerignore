@@ -1,0 +1,15 @@
+.git
+.gitignore
+.venv
+venv
+__pycache__
+**/__pycache__
+*.pyc
+.env
+*.db
+*.sqlite*
+corpus/_sources/
+corpus/_build/
+eval/results/
+*.patch
+README.md

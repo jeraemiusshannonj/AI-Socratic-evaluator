@@ -1,0 +1,21 @@
+# Build one image from a named Dockerfile.
+#
+# `gcloud run deploy --source` has no way to pick a Dockerfile -- it looks
+# for one called exactly `Dockerfile` -- and this project has three. So
+# each image is built explicitly and deployed by digest.
+#
+#   gcloud builds submit --config=deploy/cloudbuild.yaml \
+#     --substitutions=_DOCKERFILE=Dockerfile.sandbox,_IMAGE=<full image uri>
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "${_DOCKERFILE}", "-t", "${_IMAGE}", "."]
+
+images:
+  - "${_IMAGE}"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+timeout: 1200s

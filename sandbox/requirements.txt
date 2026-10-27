@@ -1,0 +1,7 @@
+# Deliberately minimal. Every package here is one a compromise could use.
+# No database driver, no cloud SDK, no dotenv -- this service has no
+# credentials to find, and nothing in it should create the ability to
+# reach anything.
+fastapi
+uvicorn[standard]
+pydantic

@@ -1,0 +1,33 @@
+# The Streamlit front end, unchanged from local development.
+#
+# Deployed separately from the API so the two scale independently and so
+# the browser-facing service holds no credentials of its own: it talks to
+# the API over HTTP and nothing else.
+
+FROM python:3.12-slim
+
+RUN useradd --create-home --uid 10001 app
+
+WORKDIR /app
+
+# Streamlit and requests only. This service never touches Mongo or Vertex.
+RUN pip install --no-cache-dir streamlit requests
+
+COPY app.py ./
+
+USER app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8080
+
+# Cloud Run terminates TLS and handles its own health checking, so
+# Streamlit's CORS and XSRF machinery is redundant here and its usage
+# stats collection is switched off.
+CMD exec streamlit run app.py \
+      --server.port=${PORT} \
+      --server.address=0.0.0.0 \
+      --server.headless=true \
+      --server.enableCORS=false \
+      --server.enableXsrfProtection=false \
+      --browser.gatherUsageStats=false

@@ -55,6 +55,32 @@ EMBED_BATCH_SIZE = int(os.getenv("EMBED_BATCH_SIZE", "16"))
 MONGO_URI = os.getenv("MONGO_URI", "")
 MONGO_DB = os.getenv("MONGO_DB", "socratic")
 
+# ---------------------------------------------------------------------------
+# Untrusted code execution
+# ---------------------------------------------------------------------------
+# URL of the sandbox Cloud Run service. When set, student code is executed
+# there -- a service with no credentials, no network egress and
+# internal-only ingress. When unset, it runs in this process, which is
+# acceptable on a laptop and not acceptable anywhere else.
+SANDBOX_URL = os.getenv("SANDBOX_URL", "")
+
+# Cloud Run sets K_SERVICE. Its presence is how the API knows it is
+# deployed and should refuse to execute untrusted code in-process.
+IS_DEPLOYED = bool(os.getenv("K_SERVICE"))
+ALLOW_LOCAL_EXECUTION = os.getenv("ALLOW_LOCAL_EXECUTION", "") == "1"
+
+# ---------------------------------------------------------------------------
+# Rate limiting
+# ---------------------------------------------------------------------------
+# A public endpoint that calls Gemini is a way for a stranger to spend the
+# project's budget. These are the two caps that stop that: a per-IP window
+# and a total for the day across everyone.
+RATE_LIMIT_PER_IP = int(os.getenv("RATE_LIMIT_PER_IP", "30"))
+RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "3600"))
+RATE_LIMIT_DAILY_TOTAL = int(os.getenv("RATE_LIMIT_DAILY_TOTAL", "500"))
+# Endpoints that cost money. Cheap reads are not metered.
+METERED_PATHS = ("/api/generate", "/api/evaluate", "/api/search")
+
 COLL_CHUNKS = "cs_chunks"          # unstructured: vector-searched
 COLL_MISCONCEPTIONS = "misconceptions"  # structured: taxonomy
 COLL_INTERACTIONS = "interactions"      # structured: student history

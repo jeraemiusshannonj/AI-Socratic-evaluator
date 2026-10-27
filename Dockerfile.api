@@ -1,0 +1,27 @@
+# The API service: retrieval, the tutor, and the Atlas and Vertex clients.
+#
+# This is the service that holds credentials -- the Mongo connection string
+# from Secret Manager and a service account scoped to Vertex AI User. It is
+# precisely why untrusted code does not run here; see Dockerfile.sandbox.
+
+FROM python:3.12-slim
+
+RUN useradd --create-home --uid 10001 app
+
+WORKDIR /app
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY socratic/ ./socratic/
+COPY corpus/ ./corpus/
+COPY data/ ./data/
+COPY main.py misconceptions.csv ./
+
+USER app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8080
+
+CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT} --workers 1
