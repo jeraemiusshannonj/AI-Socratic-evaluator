@@ -194,6 +194,10 @@ class Answer:
   valid_citations: list[str] = field(default_factory=list)
   invalid_citations: list[str] = field(default_factory=list)
   passages: list[Passage] = field(default_factory=list)
+  # False means the model judged none of the retrieved passages relevant,
+  # so citing nothing is a deliberate refusal rather than an ungrounded
+  # answer. Without this the revision loop retried every correct refusal.
+  material_relevant: bool = True
   plan: Plan = field(default_factory=Plan)
   revisions: int = 0
   revision_reason: str = ""
@@ -203,6 +207,11 @@ class Answer:
   def grounded(self) -> bool:
     return bool(self.valid_citations)
 
+  @property
+  def declined(self) -> bool:
+    """Declined because the corpus does not cover the question."""
+    return bool(self.passages) and not self.material_relevant
+
   def to_dict(self) -> dict[str, Any]:
     return {
         "answer": self.text,
@@ -210,6 +219,8 @@ class Answer:
         "valid_citations": self.valid_citations,
         "invalid_citations": self.invalid_citations,
         "grounded": self.grounded,
+        "material_relevant": self.material_relevant,
+        "declined": self.declined,
         "revisions": self.revisions,
         "revision_reason": self.revision_reason,
         "plan": self.plan.to_dict(),
@@ -345,8 +356,12 @@ material does not answer the question, say so plainly rather than filling
 the gap from memory.
 
 In `citations`, list the ids in square brackets of the passages you
-actually used, exactly as written above. Cite only ids shown above. If you
-used none, return an empty list."""
+actually used, exactly as written above. Cite only ids shown above.
+
+If none of the passages bear on the question, set `material_relevant` to
+false, return an empty citations list, and tell the student the material
+does not cover it. That is the correct answer in that case, not a
+failure."""
 
 _REVISION_NOTE = """\
 
@@ -363,8 +378,16 @@ _ANSWER_SCHEMA = {
     "properties": {
         "answer": {"type": "STRING"},
         "citations": {"type": "ARRAY", "items": {"type": "STRING"}},
+        "material_relevant": {
+            "type": "BOOLEAN",
+            "description": (
+                "True if the retrieved passages bear on this question. "
+                "False if none of them do -- then cite nothing and say the "
+                "material does not cover it."
+            ),
+        },
     },
-    "required": ["answer", "citations"],
+    "required": ["answer", "citations", "material_relevant"],
 }
 
 
@@ -406,8 +429,10 @@ def answer_question(
     data = tutor._parse_evaluation(raw)
     text = str(data.get("answer") or data.get("feedback") or "")
     citations = tutor._normalise_citations(data.get("citations"), text)
+    material_relevant = bool(data.get("material_relevant", True))
 
-    problem = tutor.check_grounding(citations, supplied, bool(passages))
+    problem = tutor.check_grounding(
+        citations, supplied, bool(passages), material_relevant)
     if not problem or revisions >= MAX_REVISIONS:
       if problem:
         log.warning("Answer still ungrounded after %d revision(s): %s",
@@ -425,6 +450,7 @@ def answer_question(
       valid_citations=[c for c in citations if c in supplied],
       invalid_citations=[c for c in citations if c not in supplied],
       passages=passages,
+      material_relevant=material_relevant,
       plan=plan,
       revisions=revisions,
       revision_reason=revision_reason,

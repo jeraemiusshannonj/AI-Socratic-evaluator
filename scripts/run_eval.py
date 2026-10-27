@@ -236,6 +236,8 @@ a refusal -- set refused to false."""
 class RefusalOutcome:
   total: int = 0
   refused: int = 0
+  declined_structurally: int = 0
+  revisions_spent: int = 0
   fabricated: int = 0
   answered_anyway: list[dict] = field(default_factory=list)
   top_scores: list[float] = field(default_factory=list)
@@ -246,6 +248,8 @@ class RefusalOutcome:
         "refused": self.refused,
         "correct_refusal_rate": round(self.refused / self.total, 3)
                                 if self.total else 0,
+        "declared_material_irrelevant": self.declined_structurally,
+        "revisions_spent": self.revisions_spent,
         "fabricated_citations": self.fabricated,
         "top_score_median": round(statistics.median(self.top_scores), 4)
                             if self.top_scores else None,
@@ -272,6 +276,9 @@ def run_refusal(k: int, usage: vertex.Usage) -> RefusalOutcome:
 
     if answer.passages:
       outcome.top_scores.append(max(p.score for p in answer.passages))
+    if answer.declined:
+      outcome.declined_structurally += 1
+    outcome.revisions_spent += answer.revisions
     if answer.invalid_citations:
       outcome.fabricated += len(answer.invalid_citations)
 
@@ -486,6 +493,10 @@ def main() -> int:
 
     print(f"\n  correct refusal  "
           f"{_pct(refusal.refused, refusal.total)}")
+    print(f"  declared the material irrelevant  "
+          f"{_pct(refusal.declined_structurally, refusal.total)}")
+    print(f"  revisions spent on refusals  {refusal.revisions_spent} "
+          f"(0 is correct; a refusal is not an ungrounded answer)")
     print(f"  fabricated citations  {refusal.fabricated}")
     if refusal.top_scores:
       print(f"  top passage score on unanswerable questions: "

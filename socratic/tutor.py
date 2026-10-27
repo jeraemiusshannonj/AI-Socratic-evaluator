@@ -115,6 +115,10 @@ class Evaluation:
   # means the model invented a source, which is the thing worth catching.
   invalid_citations: list[str] = field(default_factory=list)
   passages: list[Passage] = field(default_factory=list)
+  # Whether the critic judged the retrieved passages to bear on this
+  # question at all. False with no citations is a deliberate decline, not
+  # an ungrounded answer.
+  material_relevant: bool = True
   # How many times the answer was sent back for failing the citation
   # check, and why the last rejection happened.
   revisions: int = 0
@@ -125,6 +129,11 @@ class Evaluation:
   def grounded(self) -> bool:
     """Did the critic cite at least one passage it was actually given?"""
     return bool(self.valid_citations)
+
+  @property
+  def declined(self) -> bool:
+    """Did it decline on the grounds that the material does not cover it?"""
+    return bool(self.passages) and not self.material_relevant
 
   @property
   def model_agreed(self) -> bool | None:
@@ -146,6 +155,8 @@ class Evaluation:
         "valid_citations": self.valid_citations,
         "invalid_citations": self.invalid_citations,
         "grounded": self.grounded,
+        "material_relevant": self.material_relevant,
+        "declined": self.declined,
         "revisions": self.revisions,
         "revision_reason": self.revision_reason,
         "sources": [
@@ -303,8 +314,12 @@ one hint at the level described above.
 
 Ground your reasoning in the reference passages. In `citations`, list the
 ids in square brackets of the passages you actually relied on, exactly as
-written. Cite only passages shown above. If none of them are relevant,
-return an empty list rather than citing something unrelated."""
+written. Cite only passages shown above.
+
+If none of the passages bear on this question, set `material_relevant` to
+false, return an empty citations list, and say so. That is a correct
+response, not a failure -- do not cite something unrelated to fill the
+field."""
 
 _EVAL_SCHEMA = {
     "type": "OBJECT",
@@ -323,8 +338,17 @@ _EVAL_SCHEMA = {
             "items": {"type": "STRING"},
             "description": "Chunk ids of passages relied on.",
         },
+        "material_relevant": {
+            "type": "BOOLEAN",
+            "description": (
+                "True if the reference passages bear on this question. "
+                "False if none of them do -- in which case cite nothing "
+                "and say the material does not cover it."
+            ),
+        },
     },
-    "required": ["reasoning", "is_correct", "feedback", "citations"],
+    "required": ["reasoning", "is_correct", "feedback", "citations",
+                 "material_relevant"],
 }
 
 
@@ -471,7 +495,9 @@ def evaluate_student(
     cited = _normalise_citations(
         data.get("citations"), data.get("feedback", ""))
 
-    problem = check_grounding(cited, supplied, bool(passages))
+    material_relevant = bool(data.get("material_relevant", True))
+    problem = check_grounding(
+        cited, supplied, bool(passages), material_relevant)
     if not problem or revisions >= MAX_REVISIONS:
       if problem:
         log.warning("Evaluation still ungrounded after %d revision(s): %s",
@@ -505,6 +531,7 @@ def evaluate_student(
       valid_citations=[c for c in cited if c in supplied],
       invalid_citations=[c for c in cited if c not in supplied],
       passages=list(passages),
+      material_relevant=material_relevant,
       revisions=revisions,
       revision_reason=revision_reason,
       usage=usage.summary() if usage else {},
@@ -512,15 +539,28 @@ def evaluate_student(
 
 
 def check_grounding(
-    citations: list[str], supplied: set[str], had_passages: bool
+    citations: list[str],
+    supplied: set[str],
+    had_passages: bool,
+    material_relevant: bool = True,
 ) -> str:
   """Why this answer should be revised, or "" if it should not.
 
-  Two failures earn a retry. Citing an id that was never supplied is a
-  fabricated source. Citing nothing while passages were available means
-  the answer came from the model's own knowledge while the response still
-  carries a citations field -- which is the failure that field exists to
-  catch.
+  Citing an id that was never supplied is a fabricated source and always
+  earns a retry.
+
+  Citing nothing is the interesting case, because it has two opposite
+  meanings. If the passages do bear on the question and the model ignored
+  them, the answer came from its own knowledge while still presenting a
+  citations field -- exactly what that field exists to catch. If the
+  passages do not bear on the question, citing nothing is the correct
+  answer and retrying is wrong.
+
+  Text cannot distinguish those reliably, so the model declares which it
+  means in `material_relevant`. Before that field existed this check
+  revised every refusal: measured over the twelve unanswerable questions
+  in eval/, ten triggered a pointless second call and logged a warning
+  that read like a failure when the system had just behaved correctly.
   """
   invalid = [c for c in citations if c not in supplied]
   if invalid:
@@ -528,10 +568,11 @@ def check_grounding(
         f"You cited {invalid}, which were not among the passages you were "
         f"given. Only these ids exist: {sorted(supplied)}."
     )
-  if had_passages and not citations:
+  if had_passages and not citations and material_relevant:
     return (
-        "You cited nothing, although passages were supplied. Either cite "
-        "the ones you used, or say the material does not cover it."
+        "You cited nothing, although you judged the passages relevant. "
+        "Either cite the ones you used, or set material_relevant to false "
+        "and say the material does not cover this."
     )
   return ""
 
