@@ -1,0 +1,70 @@
+From e99673789962baef7e7c6b8655eb9047663a62ce Mon Sep 17 00:00:00 2001
+From: Jeraemius Shannon <shannon99946@gmail.com>
+Date: Tue, 27 Oct 2026 17:47:41 -0500
+Subject: [PATCH] Fix the code editor staying blank on current Streamlit
+
+---
+ app.py | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
+
+diff --git a/app.py b/app.py
+index 8ccf065..b99c72f 100644
+--- a/app.py
++++ b/app.py
+@@ -125,7 +125,9 @@ def chat_message(role: str):
+ _DEFAULTS = {
+     "messages": [],
+     "code_editor": "",
++    "code_editor_input": "",
+     "original_flawed_code": "",
++    "pending_code_reset": False,
+     "selected_concept": "Linear Search",
+     "expected_fix": "",
+     "attempt_count": 1,
+@@ -196,6 +198,10 @@ def generate_new_problem(concept_name: str) -> None:
+ 
+   data = response.json()
+   flawed_code = data.get("flawed_code", "")
++  # Assigning the widget's own key is what actually updates the editor.
++  # Safe here because this runs from the sidebar, before the text area is
++  # instantiated in this script run.
++  st.session_state.code_editor_input = flawed_code
+   st.session_state.code_editor = flawed_code
+   st.session_state.original_flawed_code = flawed_code
+   st.session_state.expected_fix = data.get("expected_fix", "")
+@@ -301,9 +307,18 @@ col_code, col_chat = st.columns([1, 1], gap="medium")
+ with col_code:
+   st.subheader("Code under review")
+ 
++  if st.session_state.get("pending_code_reset"):
++    st.session_state.code_editor_input = st.session_state.original_flawed_code
++    st.session_state.pending_code_reset = False
++
++  # The widget key is the single source of truth. Passing both `value=`
++  # and `key=` works on older Streamlit and silently does nothing on
++  # newer: once the key exists in session state the stored value wins and
++  # `value=` is ignored, so generated code never reached the editor. That
++  # is why this worked locally on an old Streamlit and came up blank on
++  # Cloud Run, which installs the current one.
+   edited_code = st.text_area(
+       label="Code editor",
+-      value=st.session_state.code_editor,
+       key="code_editor_input",
+       height=260,
+   )
+@@ -314,7 +329,11 @@ with col_code:
+         f"**{st.session_state.signature}** -- {st.session_state.contract}")
+ 
+   if st.button("Reset code to original"):
+-    st.session_state.code_editor = st.session_state.original_flawed_code
++    # Streamlit refuses an assignment to a widget's key after that widget
++    # has been instantiated in the current run, and this button renders
++    # below the editor. So record the intent and apply it at the top of
++    # the next run, before the text area exists.
++    st.session_state.pending_code_reset = True
+     safe_rerun()
+ 
+   st.subheader("Sandbox")
+-- 
+2.43.0
+

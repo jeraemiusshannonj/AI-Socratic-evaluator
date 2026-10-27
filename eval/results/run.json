@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-27T05:58:59Z",
+  "generated_at": "2026-10-27T23:26:18Z",
   "models": {
     "generation": "gemini-3.8-flash",
     "embedding": "gemini-embedding-001",
@@ -10,15 +10,16 @@
   "corpus": {
     "chunks": 504,
     "misconceptions": 22,
-    "interactions": 115,
+    "interactions": 119,
     "test_cases": 79,
-    "distinct_concepts": 23,
+    "distinct_concepts": 22,
+    "untagged_chunks": 156,
     "distinct_sources": 54,
     "licenses": [
       "MIT",
       "PSF-2.0"
     ],
-    "interactions_since": "2021-10-28T05:58:59.126855+00:00"
+    "interactions_since": "2021-10-28T23:26:18.019368+00:00"
   },
   "retrieval": {
     "filtered": {
@@ -27,7 +28,7 @@
       "hit_at_k": 28,
       "hit_at_1_rate": 0.929,
       "hit_at_k_rate": 1.0,
-      "p50_latency_ms": 190.0,
+      "p50_latency_ms": 207.7,
       "misses": []
     },
     "unfiltered": {
@@ -36,7 +37,7 @@
       "hit_at_k": 28,
       "hit_at_1_rate": 0.893,
       "hit_at_k_rate": 1.0,
-      "p50_latency_ms": 172.1,
+      "p50_latency_ms": 204.7,
       "misses": []
     }
   },
@@ -46,9 +47,9 @@
     "verdict_accuracy": 1.0,
     "model_agreement": 1.0,
     "model_judged_on": 44,
-    "grounded": 41,
-    "grounded_rate": 0.932,
-    "citations_total": 52,
+    "grounded": 39,
+    "grounded_rate": 0.886,
+    "citations_total": 51,
     "citations_fabricated": 0,
     "citation_validity": 1.0,
     "disagreements": [],
@@ -56,11 +57,79 @@
   },
   "usage": {
     "calls": 44,
-    "prompt_tokens": 69248,
-    "output_tokens": 7177,
-    "total_tokens": 76425,
-    "tokens_per_sec": 76.6,
-    "p50_latency_ms": 5728.3,
-    "p95_latency_ms": 50684.5
+    "prompt_tokens": 73472,
+    "output_tokens": 7723,
+    "total_tokens": 81195,
+    "tokens_per_sec": 196.9,
+    "p50_latency_ms": 5926.1,
+    "p95_latency_ms": 15061.1
+  },
+  "routing": {
+    "questions": 12,
+    "path_correct": 10,
+    "path_accuracy": 0.833,
+    "tool_correct": 10,
+    "tool_accuracy": 1.0,
+    "mistakes": [
+      {
+        "query": "why do I keep getting binary search wrong",
+        "expected_path": "both",
+        "expected_tool": null,
+        "chose": [
+          "student_concept_history",
+          "lookup_misconception"
+        ],
+        "reasoning": "The student is asking about their repeated failures ('why do I keep getting binary search wrong'). Checking student_concept_history provides their past attempt records and outcomes on this concept, while lookup_misconception identifies the specific bug or underlying misconception tied to the current exercise."
+      },
+      {
+        "query": "am I improving at sorting, and what am I still missing",
+        "expected_path": "both",
+        "expected_tool": null,
+        "chose": [
+          "student_concept_history",
+          "weakest_concepts"
+        ],
+        "reasoning": "The student asks whether they are improving at sorting, which requires examining their performance records over time using student_concept_history, and what they are still missing, which requires identifying their lowest-performing areas using weakest_concepts."
+      }
+    ]
+  },
+  "usage_by_stage": {
+    "routing": {
+      "calls": 12,
+      "prompt_tokens": 5033,
+      "output_tokens": 954,
+      "total_tokens": 5987,
+      "tokens_per_sec": 130.3,
+      "p50_latency_ms": 3060.0,
+      "p95_latency_ms": 9831.5
+    },
+    "refusal": {
+      "calls": 36,
+      "prompt_tokens": 30052,
+      "output_tokens": 1878,
+      "total_tokens": 31930,
+      "tokens_per_sec": 134.2,
+      "p50_latency_ms": 3995.6,
+      "p95_latency_ms": 12303.8
+    }
+  },
+  "refusal": {
+    "questions": 12,
+    "refused": 12,
+    "correct_refusal_rate": 1.0,
+    "declared_material_irrelevant": 12,
+    "revisions_spent": 0,
+    "fabricated_citations": 0,
+    "top_score_median": 0.8044,
+    "top_score_max": 0.8322,
+    "answered_anyway": []
+  },
+  "cost": {
+    "calls": 92,
+    "prompt_tokens": 108557,
+    "output_tokens": 10555,
+    "total_cost_usd": null,
+    "cost_per_call_usd": null,
+    "pricing_configured": false
   }
 }
