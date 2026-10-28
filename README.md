@@ -11,6 +11,30 @@ Deployed on Cloud Run. Built on **MongoDB Atlas Vector Search** and
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart TD
+    Q[Question + concept] --> R["Router call (plan_turn)\ngemini-3.8-flash"]
+    R -->|structured path| S[("MongoDB\ninteraction history,\ntaxonomy, test cases")]
+    R -->|semantic path| V[("Atlas Vector Search\n504 embedded chunks")]
+    S --> G["Generation call (answer_question)\ngemini-3.8-flash"]
+    V --> G
+    G --> C{"check_grounding\n(deterministic, no model call)\nvalid citations? relevant\npassages cited?"}
+    C -->|fails, 1st time| RV["Revise prompt,\nregenerate (MAX_REVISIONS = 1)"]
+    RV --> G
+    C -->|passes, or budget spent| OUT[Answer + citations]
+```
+
+One model plans the retrieval path, one model generates the answer and
+self-reports its own citations and relevance. `check_grounding` is a
+plain Python function, not a second model call — it checks the first
+call's citations against the passages it was actually given and can send
+the prompt back once. This is a router plus a self-revising generator,
+not a multi-agent system; nothing here claims otherwise.
+
+---
+
 ## What makes it more than a RAG demo
 
 **Two retrieval pipelines, chosen per turn.** "Why does `high = mid` loop
