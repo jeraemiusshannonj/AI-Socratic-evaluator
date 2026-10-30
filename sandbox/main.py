@@ -2,9 +2,9 @@
 
 This exists to be the blast radius. The main API holds a Mongo connection
 string and a Vertex-capable service account; this service holds neither,
-reaches no network, writes to no persistent disk, and can be reached only
-from inside the project. Running untrusted student code here rather than
-in the API process is the difference between a bug and an incident.
+and can be invoked only by the API's service account. Running untrusted
+student code here rather than in the API process is the difference
+between a bug and an incident.
 
 It is deliberately the smallest thing that can work:
 
@@ -15,10 +15,22 @@ It is deliberately the smallest thing that can work:
     logs are readable from the console
 
 The guarantees that matter are not in this file. They are on the Cloud Run
-service: `--no-allow-unauthenticated` and internal ingress so only the API
-can call it, `--vpc-egress` unset with no connector so it has no route out,
-a service account with zero roles, a memory cap, and a non-root user in the
-image. See deploy/deploy.sh.
+service: `--no-allow-unauthenticated` with `roles/run.invoker` granted only
+to the API's service account, so Google's front end rejects every other
+caller; a service account with zero roles; `--concurrency=1`; a memory cap;
+and a non-root user in the image. See deploy/deploy.sh.
+
+What it does not have, stated so nobody assumes otherwise:
+
+  * internal ingress. `--ingress=internal` means "from VPC networks", and
+    Cloud Run to Cloud Run calls do not cross a VPC without a paid
+    connector, so it would break the API's calls. IAM is the boundary.
+  * an egress block. Cloud Run allows outbound traffic by default and
+    removing it needs a VPC connector. Student code can reach the
+    internet; it finds nothing here worth sending.
+  * a read-only filesystem. The container filesystem is in-memory and
+    writable; each run gets a fresh temporary directory that is removed
+    afterwards, and nothing survives an instance being recycled.
 """
 
 from __future__ import annotations

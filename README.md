@@ -196,12 +196,22 @@ Three Cloud Run services, all scale-to-zero.
 | `socratic-api` | yes, rate-limited | Mongo URI, Vertex SA | retrieval, tutor, taxonomy |
 | `socratic-sandbox` | **no** | **none** | executes untrusted code |
 
-`/api/run` executes arbitrary Python from the request body. Running that
-beside a Mongo connection string and a Vertex-capable service account
-means any submission can read both. The sandbox service has no
-credentials, an image containing two Python files and FastAPI, a service
-account with zero IAM roles, and `--no-allow-unauthenticated` so Google's
-edge rejects every caller but the API.
+`/api/run` and `/api/evaluate` both execute arbitrary Python from the
+request body. Running that beside a Mongo connection string and a
+Vertex-capable service account means any submission can read both. Both
+paths go through `socratic/sandbox_client.py` to a sandbox service that
+has no credentials, an image containing two Python files and FastAPI, a
+service account with zero IAM roles, and `--no-allow-unauthenticated` so
+Google's edge rejects every caller but the API.
+
+Grading originally did not: `verify.py` called the in-process
+executor directly, so every graded submission ran inside the API with the
+credentials beside it, while only the Run button used the sandbox. The fix
+is one import. It was found by tracing every caller of the executor rather
+than trusting the module boundary, and is verified by grading all 44
+reference implementations against a local sandbox with the in-process
+executor replaced by one that raises: 66 sandbox calls, zero in-process
+runs, identical verdicts.
 
 The API **refuses to start** without `SANDBOX_URL` when it detects it is
 deployed. Falling back to in-process execution is right on a laptop and
@@ -348,6 +358,24 @@ regenerate if the targeted case does not fail — not yet built.
 default and blocking it needs a VPC connector with no NAT route, which is
 not in the free tier. The sandbox has nothing worth exfiltrating, but it
 could be used as a traffic source.
+
+**The per-IP rate limit can be sidestepped.** It keys on the leftmost
+`X-Forwarded-For` entry, which a caller can supply. The 500-a-day total is
+keyed on the date alone, so spend stays bounded, but one caller could use
+the whole day's allowance. The fix is to count from the right past known
+proxies, once the header shape Cloud Run delivers is confirmed from a
+logged request rather than assumed.
+
+**`/api/run` is not rate-limited.** Only endpoints that call a model are
+metered. Running code costs sandbox compute, not model tokens, and the
+sandbox caps it at five instances with one program each, but combined with
+open egress it is the route by which the sandbox could be used as a
+traffic source.
+
+**Student history is not authenticated.** A student id is 48 random bits
+generated in the browser session, and `/api/history/{student_id}` returns
+that id's records to whoever presents it. Unguessable in practice, but it
+is a bearer token in a URL, not an account.
 
 **Atlas accepts connections from anywhere.** Cloud Run egresses from
 Google's address pool, so the access list is `0.0.0.0/0` and the database

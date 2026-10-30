@@ -29,8 +29,14 @@ A case marked `isolate` runs in a process of its own. Several of these
 bugs hang rather than return, and one hanging case in a shared batch
 would report every later case as untested.
 
-Execution reuses `socratic.execute`, so the same caveat applies: this is
-isolation against accidents, not against an attacker.
+Execution goes through `socratic.sandbox_client`, the same path as the
+API's run endpoint: the sandbox service when `SANDBOX_URL` is set, and
+`socratic.execute` in-process only when it is not, which is local
+development. This module previously called `socratic.execute` directly,
+so on the deployed API every graded submission ran inside the process
+holding the Mongo credentials and the Vertex service account -- the
+exact thing the sandbox service exists to prevent, on the most-used
+path.
 """
 
 from __future__ import annotations
@@ -41,7 +47,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Sequence
 
-from . import execute
+from . import sandbox_client
 
 log = logging.getLogger(__name__)
 
@@ -273,7 +279,7 @@ def _run_batch(
     code: str, cases: Sequence[dict], rationales: dict[str, str]
 ) -> list[CaseResult]:
   driver = _DRIVER.format(cases_json=json.dumps(list(cases)))
-  outcome = execute.run_student_code(code, driver, timeout=CASE_TIMEOUT)
+  outcome = sandbox_client.run(code, driver, timeout=CASE_TIMEOUT)
 
   marker = "__TEST_RESULTS__"
   if marker in outcome.output:

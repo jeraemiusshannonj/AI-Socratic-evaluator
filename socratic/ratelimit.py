@@ -69,11 +69,19 @@ def _collection():
 
 
 def client_ip(headers: dict, fallback: str = "unknown") -> str:
-  """The caller's address, as seen through Cloud Run's proxy.
+  """The caller's address, taken from X-Forwarded-For.
 
-  Cloud Run appends the real client to X-Forwarded-For, so the leftmost
-  entry is the one to use. Trusting the whole header would let a caller
-  spoof an address and get a fresh allowance per request.
+  Known weakness: this takes the leftmost entry, which is correct when the
+  client sends no X-Forwarded-For of its own and wrong when it does. A
+  proxy that appends to the header keeps whatever the client supplied on
+  the left, so a caller can choose its own key and get a fresh per-IP
+  allowance per request. The daily total in `check()` is keyed on nothing
+  the caller controls, so total spend stays bounded either way.
+
+  The fix is to count from the right, skipping the entries added by known
+  proxies. That needs the exact header shape Cloud Run delivers, confirmed
+  from one logged request, rather than assumed; a wrong guess would put
+  every user in one bucket.
   """
   forwarded = headers.get("x-forwarded-for") or headers.get("X-Forwarded-For")
   if forwarded:
